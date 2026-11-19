@@ -17,7 +17,7 @@ public final class WidgetJobService extends JobService {
     private static final String TAG = "MCMonitorWidgetJob";
     private static final int PERIODIC_JOB_ID = 7301;
     private static final int REFRESH_JOB_ID = 7302;
-    private static final long REFRESH_INTERVAL = 30 * 60 * 1000L;
+    private static final long REFRESH_INTERVAL = 15 * 60 * 1000L;
     private static final Object REFRESH_LOCK = new Object();
 
     private final ConcurrentHashMap<Integer, JobRun> runningJobs = new ConcurrentHashMap<>();
@@ -28,12 +28,16 @@ public final class WidgetJobService extends JobService {
             if (scheduler == null) {
                 return;
             }
-            if (!WidgetUpdater.hasWidgets(context)) {
+            if (!hasMonitoringTargets(context)) {
                 scheduler.cancel(PERIODIC_JOB_ID);
                 return;
             }
-            if (scheduler.getPendingJob(PERIODIC_JOB_ID) != null) {
+            JobInfo pending = scheduler.getPendingJob(PERIODIC_JOB_ID);
+            if (pending != null && pending.getIntervalMillis() == REFRESH_INTERVAL) {
                 return;
+            }
+            if (pending != null) {
+                scheduler.cancel(PERIODIC_JOB_ID);
             }
 
             JobInfo job = new JobInfo.Builder(
@@ -52,7 +56,7 @@ public final class WidgetJobService extends JobService {
 
     public static void requestRefresh(Context context) {
         try {
-            if (!WidgetUpdater.hasWidgets(context)) {
+            if (!hasMonitoringTargets(context)) {
                 return;
             }
             JobScheduler scheduler = scheduler(context);
@@ -80,6 +84,25 @@ public final class WidgetJobService extends JobService {
         return scheduler;
     }
 
+    private static boolean hasMonitoringTargets(Context context) {
+        if (WidgetUpdater.hasWidgets(context)) {
+            return true;
+        }
+        if (AccountSessionStore.load(context) != null) {
+            return true;
+        }
+        for (ServerEntry server : ServerStore.load(context)) {
+            if (server.priorityPlayers != null) {
+                for (String player : server.priorityPlayers) {
+                    if (player != null && !player.trim().isEmpty()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     @Override
     public boolean onStartJob(JobParameters params) {
         JobRun run = new JobRun();
@@ -87,6 +110,18 @@ public final class WidgetJobService extends JobService {
         run.thread = new Thread(() -> {
             try {
                 synchronized (REFRESH_LOCK) {
+                    if (!run.stopped.get()) {
+                        AccountSession session = AccountSessionStore.load(
+                                getApplicationContext());
+                        if (session != null) {
+                            try {
+                                CloudSyncClient.synchronizeServers(
+                                        getApplicationContext(), session);
+                            } catch (Exception exception) {
+                                Log.w(TAG, "Не удалось обновить приоритеты из облака", exception);
+                            }
+                        }
+                    }
                     if (!run.stopped.get()) {
                         WidgetUpdater.refreshAllBlocking(getApplicationContext());
                     }

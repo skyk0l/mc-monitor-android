@@ -178,8 +178,14 @@ public final class WidgetUpdater {
         for (WidgetStore.Info info : WidgetStore.all(app).values()) {
             addresses.add(info.address);
         }
-        if (addresses.isEmpty()) {
-            for (ServerEntry entry : ServerStore.load(app)) {
+        List<ServerEntry> servers = ServerStore.load(app);
+        for (ServerEntry server : servers) {
+            if (server.priorityPlayers != null && !server.priorityPlayers.isEmpty()) {
+                addresses.add(server.address);
+            }
+        }
+        if (addresses.isEmpty() && hasWidgets(app)) {
+            for (ServerEntry entry : servers) {
                 addresses.add(entry.address);
             }
         }

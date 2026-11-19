@@ -221,6 +221,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         applySavedAccent();
+        WidgetJobService.schedule(this);
         refreshAll();
         requestCloudSync(true);
         handler.removeCallbacks(autoRefresh);
@@ -234,6 +235,41 @@ public class MainActivity extends Activity {
         super.onPause();
         handler.removeCallbacks(autoRefresh);
         handler.removeCallbacks(periodicCloudSync);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_NOTIFICATIONS) {
+            return;
+        }
+        if (grantResults.length > 0
+                && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(
+                    this, "Уведомления о приоритетных игроках включены.", Toast.LENGTH_SHORT).show();
+            WidgetJobService.schedule(this);
+            WidgetJobService.requestRefresh(this);
+            return;
+        }
+        showNotificationSettingsPrompt();
+    }
+
+    private void showNotificationSettingsPrompt() {
+        new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle("Уведомления отключены")
+                .setMessage("Разреши уведомления для MC Monitor в настройках Android, "
+                        + "чтобы получать оповещения о входе и выходе приоритетных игроков.")
+                .setNegativeButton("Позже", null)
+                .setPositiveButton("Открыть настройки", (dialog, which) -> {
+                    Intent settings = new Intent(
+                            android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                            .putExtra(
+                                    android.provider.Settings.EXTRA_APP_PACKAGE,
+                                    getPackageName());
+                    startActivity(settings);
+                })
+                .show();
     }
 
     @Override
@@ -634,6 +670,8 @@ public class MainActivity extends Activity {
                                 .setMessage("Локальный список серверов останется на устройстве.")
                                 .setPositiveButton("Выйти", (confirm, action) -> {
                                     AccountSessionStore.clearSession(this);
+                                    WidgetJobService.schedule(this);
+                                    WidgetJobService.requestRefresh(this);
                                     updateAccountButton();
                                     Toast.makeText(this, "Вы вышли из аккаунта.", Toast.LENGTH_SHORT)
                                             .show();
@@ -1384,27 +1422,10 @@ public class MainActivity extends Activity {
 
         private int synchronizeWithCloud(AccountSession session) throws Exception {
             Context context = getApplicationContext();
-            String previousOwner = AccountSessionStore.lastOwnerId(context);
-            List<ServerEntry> local = ServerStore.load(context);
-            List<ServerEntry> remote = CloudSyncClient.fetchServers(session);
-            List<ServerEntry> merged;
-            if (previousOwner != null && !previousOwner.equals(session.userId)) {
-                AccountSessionStore.saveBaseServers(context, new java.util.ArrayList<>());
-                merged = remote;
-            } else {
-                List<ServerEntry> base = previousOwner == null
-                        ? null
-                        : AccountSessionStore.loadBaseServers(context);
-                merged = CloudSyncClient.mergeServers(base, local, remote);
-            }
-            List<ServerEntry> latestLocal = ServerStore.load(context);
-            merged = CloudSyncClient.mergeServers(local, latestLocal, merged);
-            ServerStore.save(context, merged);
-            AccountSessionStore.saveOwnerId(context, session.userId);
-            CloudSyncClient.saveServers(session, merged);
-            AccountSessionStore.saveBaseServers(context, merged);
-            AccountSessionStore.save(context, session);
-            return merged.size();
+            int serverCount = CloudSyncClient.synchronizeServers(context, session);
+            WidgetJobService.schedule(context);
+            WidgetJobService.requestRefresh(context);
+            return serverCount;
         }
 
         private String cloudErrorMessage(Exception exception) {
@@ -1579,13 +1600,11 @@ public class MainActivity extends Activity {
                 }
                 entry.priorityPlayers = names;
                 ServerStore.saveEntry(this, entry);
+                WidgetJobService.schedule(this);
+                WidgetJobService.requestRefresh(this);
                 requestCloudSync(true);
-                if (!names.isEmpty() && Build.VERSION.SDK_INT >= 33
-                        && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    requestPermissions(
-                            new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
-                            REQUEST_NOTIFICATIONS);
+                if (!names.isEmpty()) {
+                    requestPriorityNotificationPermission();
                 }
                 dialog.dismiss();
                 Toast.makeText(this, names.isEmpty()
@@ -1595,6 +1614,35 @@ public class MainActivity extends Activity {
             });
         });
         dialog.show();
+    }
+
+    private void requestPriorityNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                    new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
+                    REQUEST_NOTIFICATIONS);
+            return;
+        }
+        if (!arePriorityNotificationsEnabled()) {
+            showNotificationSettingsPrompt();
+        }
+    }
+
+    private boolean arePriorityNotificationsEnabled() {
+        android.app.NotificationManager manager =
+                (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        if (manager == null || !manager.areNotificationsEnabled()) {
+            return false;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            android.app.NotificationChannel channel =
+                    manager.getNotificationChannel(PriorityPlayerNotifications.CHANNEL_ID);
+            return channel == null
+                    || channel.getImportance() != android.app.NotificationManager.IMPORTANCE_NONE;
+        }
+        return true;
     }
 
     private void showGroupDialog(ServerEntry entry) {

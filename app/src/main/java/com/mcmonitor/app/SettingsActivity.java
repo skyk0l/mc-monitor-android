@@ -1,24 +1,42 @@
 package com.mcmonitor.app;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.PendingIntent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.Insets;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
+import android.content.Intent;
+import android.content.pm.PackageInstaller;
+import android.content.pm.PackageManager;
+import android.provider.Settings;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+
 /** Dedicated settings screen for app accents and widget appearance. */
 public class SettingsActivity extends Activity {
+    private static final String PREFERENCES = "app_settings";
+    private static final String PENDING_UPDATE_APK = "pending_update_apk";
+    private static final String INSTALL_STATUS_ACTION =
+            "com.mcmonitor.app.ACTION_UPDATE_INSTALL_STATUS";
 
     private static final int[] APP_ACCENTS = {
             0xFF7EE0A3, 0xFF7EB9FF, 0xFFBF9DFF, 0xFFFF83A7, 0xFFFFC978
@@ -30,6 +48,9 @@ public class SettingsActivity extends Activity {
     private LinearLayout content;
     private View root;
     private BackdropView backdrop;
+    private Button updateButton;
+    private TextView updateStatus;
+    private ProgressBar updateProgress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,7 +133,166 @@ public class SettingsActivity extends Activity {
         TextView account = text("Аккаунт и синхронизация находятся в меню профиля.", 12, 0xFF929A97);
         account.setPadding(0, dp(18), 0, 0);
         content.addView(account);
+
+        addSection("ОБНОВЛЕНИЯ");
+        addHint("APK загружается из официального GitHub-релиза. Установку нужно подтвердить в Android.");
+        updateButton = new Button(this);
+        updateButton.setText("Проверить обновления");
+        updateButton.setOnClickListener(v -> checkForUpdates());
+        content.addView(updateButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
+        updateProgress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        updateProgress.setMax(100);
+        updateProgress.setVisibility(View.GONE);
+        content.addView(updateProgress, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(6)));
+        updateStatus = text("", 12, 0xFF929A97);
+        updateStatus.setPadding(0, dp(4), 0, 0);
+        content.addView(updateStatus);
         applyWindowInsets();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                && getPackageManager().canRequestPackageInstalls()) {
+            String pendingPath = getSharedPreferences(PREFERENCES, MODE_PRIVATE)
+                    .getString(PENDING_UPDATE_APK, null);
+            if (pendingPath != null) {
+                getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit()
+                        .remove(PENDING_UPDATE_APK).apply();
+                File apk = new File(pendingPath);
+                if (apk.isFile()) {
+                    installUpdate(apk);
+                } else if (updateStatus != null) {
+                    updateStatus.setText("Загруженный APK не найден. Проверь обновления ещё раз.");
+                }
+            }
+        }
+    }
+
+    private void checkForUpdates() {
+        updateButton.setEnabled(false);
+        updateProgress.setVisibility(View.GONE);
+        updateStatus.setText("Проверяю GitHub Releases…");
+        AppUpdateManager.checkForUpdate(this, new AppUpdateManager.CheckCallback() {
+            @Override
+            public void onLatest() {
+                updateButton.setEnabled(true);
+                updateStatus.setText("Установлена последняя версия.");
+            }
+
+            @Override
+            public void onUpdateAvailable(AppUpdateManager.UpdateInfo update) {
+                updateButton.setEnabled(true);
+                updateStatus.setText("Доступна версия " + update.version + ".");
+                String message = "Доступна версия " + update.version + ".";
+                if (!update.notes.trim().isEmpty()) {
+                    message += "\n\n" + update.notes.trim();
+                }
+                new AlertDialog.Builder(SettingsActivity.this)
+                        .setTitle("Доступно обновление")
+                        .setMessage(message)
+                        .setNegativeButton("Позже", (dialog, which) -> dialog.dismiss())
+                        .setPositiveButton("Скачать и установить",
+                                (dialog, which) -> downloadUpdate(update))
+                        .show();
+            }
+
+            @Override
+            public void onError(String message) {
+                updateButton.setEnabled(true);
+                updateStatus.setText("Не удалось проверить обновления: " + message);
+            }
+        });
+    }
+
+    private void downloadUpdate(AppUpdateManager.UpdateInfo update) {
+        updateButton.setEnabled(false);
+        updateProgress.setProgress(0);
+        updateProgress.setVisibility(View.VISIBLE);
+        updateStatus.setText("Скачиваю и проверяю APK…");
+        AppUpdateManager.download(this, update, new AppUpdateManager.DownloadCallback() {
+            @Override
+            public void onProgress(int percent) {
+                updateProgress.setProgress(percent);
+                updateStatus.setText("Скачиваю APK… " + percent + "%");
+            }
+
+            @Override
+            public void onDownloaded(File apk) {
+                updateButton.setEnabled(true);
+                updateProgress.setProgress(100);
+                updateStatus.setText("APK проверен. Открываю установщик Android…");
+                installUpdate(apk);
+            }
+
+            @Override
+            public void onError(String message) {
+                updateButton.setEnabled(true);
+                updateProgress.setVisibility(View.GONE);
+                updateStatus.setText("Не удалось скачать обновление: " + message);
+            }
+        });
+    }
+
+    private void installUpdate(File apk) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                && !getPackageManager().canRequestPackageInstalls()) {
+            getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit()
+                    .putString(PENDING_UPDATE_APK, apk.getAbsolutePath()).apply();
+            updateStatus.setText("Разреши установку приложений для MC Monitor и вернись сюда.");
+            try {
+                startActivity(new Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:" + getPackageName())));
+            } catch (android.content.ActivityNotFoundException exception) {
+                updateStatus.setText(
+                        "Разреши установку из этого источника в системных настройках и повтори.");
+            }
+            return;
+        }
+
+        int sessionId = -1;
+        PackageInstaller installer = getPackageManager().getPackageInstaller();
+        try {
+            PackageInstaller.SessionParams params =
+                    new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+            params.setAppPackageName(getPackageName());
+            sessionId = installer.createSession(params);
+            PackageInstaller.Session session = installer.openSession(sessionId);
+            try {
+                try (FileInputStream input = new FileInputStream(apk);
+                     OutputStream output = session.openWrite("base.apk", 0, apk.length())) {
+                    byte[] buffer = new byte[32 * 1024];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, count);
+                    }
+                    session.fsync(output);
+                }
+                Intent statusIntent = new Intent(this, UpdateInstallReceiver.class)
+                        .setAction(INSTALL_STATUS_ACTION);
+                int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+                pendingIntentFlags |= Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                        ? PendingIntent.FLAG_MUTABLE : PendingIntent.FLAG_IMMUTABLE;
+                PendingIntent statusPendingIntent = PendingIntent.getBroadcast(
+                        this,
+                        sessionId,
+                        statusIntent,
+                        pendingIntentFlags);
+                session.commit(statusPendingIntent.getIntentSender());
+            } finally {
+                session.close();
+            }
+            updateStatus.setText("Ожидай запроса Android и подтверди установку обновления.");
+        } catch (IOException | SecurityException | IllegalArgumentException exception) {
+            if (sessionId >= 0) {
+                installer.abandonSession(sessionId);
+            }
+            updateStatus.setText("Не удалось открыть установщик: " + exception.getMessage());
+        }
     }
 
     private void applyWindowInsets() {

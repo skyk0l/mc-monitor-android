@@ -1,5 +1,7 @@
 package com.mcmonitor.app;
 
+import android.content.Context;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -86,6 +88,31 @@ public final class CloudSyncClient {
                 body,
                 session,
                 "resolution=merge-duplicates,return=minimal");
+    }
+
+    public static synchronized int synchronizeServers(
+            Context context, AccountSession session) throws Exception {
+        Context app = context.getApplicationContext();
+        String previousOwner = AccountSessionStore.lastOwnerId(app);
+        List<ServerEntry> local = ServerStore.load(app);
+        List<ServerEntry> remote = fetchServers(session);
+        List<ServerEntry> merged;
+        if (previousOwner != null && !previousOwner.equals(session.userId)) {
+            AccountSessionStore.saveBaseServers(app, new ArrayList<>());
+            merged = remote;
+        } else {
+            List<ServerEntry> base = previousOwner == null
+                    ? null : AccountSessionStore.loadBaseServers(app);
+            merged = mergeServers(base, local, remote);
+        }
+        List<ServerEntry> latestLocal = ServerStore.load(app);
+        merged = mergeServers(local, latestLocal, merged);
+        ServerStore.save(app, merged);
+        AccountSessionStore.saveOwnerId(app, session.userId);
+        saveServers(session, merged);
+        AccountSessionStore.saveBaseServers(app, merged);
+        AccountSessionStore.save(app, session);
+        return merged.size();
     }
 
     public static PublicProfile fetchProfile(AccountSession session)

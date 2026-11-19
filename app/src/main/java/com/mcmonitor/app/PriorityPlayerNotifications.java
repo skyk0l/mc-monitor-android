@@ -20,7 +20,7 @@ import java.util.Set;
 
 /** Notifications for joins and leaves of explicitly watched players only. */
 public final class PriorityPlayerNotifications {
-    private static final String CHANNEL_ID = "priority_player_events";
+    static final String CHANNEL_ID = "priority_player_events";
 
     private PriorityPlayerNotifications() {
     }
