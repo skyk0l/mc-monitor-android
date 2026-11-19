@@ -9,8 +9,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.Insets;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -18,6 +20,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.text.InputType;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Base64;
 import android.util.LruCache;
 import android.util.Log;
@@ -26,6 +30,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
@@ -38,6 +43,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -45,6 +51,7 @@ import java.util.concurrent.Executors;
 public class MainActivity extends Activity {
 
     private static final String TAG = "MCMonitor";
+    private static final int REQUEST_NOTIFICATIONS = 7102;
 
     private static final long REFRESH_INTERVAL = 60_000L;
     private static final long CLOUD_SYNC_INTERVAL = 5 * 60_000L;
@@ -67,7 +74,10 @@ public class MainActivity extends Activity {
     private View emptyState;
     private ScrollView scroll;
     private TextView subtitle;
-    private TextView accountButton;
+    private TextView serverSummaryText;
+    private View accountButton;
+    private EditText searchInput;
+    private View headerActionsSpacer;
 
     private final Map<String, View> cardViews = new java.util.HashMap<>();
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
@@ -107,10 +117,32 @@ public class MainActivity extends Activity {
         emptyState = findViewById(R.id.emptyState);
         scroll = findViewById(R.id.scroll);
         subtitle = findViewById(R.id.subtitle);
+        subtitle.setText("JAVA + BEDROCK  ·  МОНИТОРИНГ СЕРВЕРОВ");
+        serverSummaryText = findViewById(R.id.serverSummaryText);
         accountButton = findViewById(R.id.accountButton);
         accountButton.setOnClickListener(v -> showAccountMenu());
 
+        searchInput = findViewById(R.id.searchInput);
+        headerActionsSpacer = findViewById(R.id.headerActionsSpacer);
+        findViewById(R.id.searchToggle).setOnClickListener(this::toggleSearch);
+        findViewById(R.id.settingsButton).setOnClickListener(v -> showSettingsDialog());
+        searchInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence value, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence value, int start, int before, int count) {
+                buildCards(false);
+            }
+
+            @Override
+            public void afterTextChanged(Editable value) {
+            }
+        });
+
         applyWindowInsets();
+        applySavedAccent();
         WidgetJobService.schedule(this);
         WidgetJobService.requestRefresh(this);
 
@@ -198,46 +230,83 @@ public class MainActivity extends Activity {
     }
 
     private void buildCards() {
+        buildCards(true);
+    }
+
+    private void buildCards(boolean animateCards) {
         cardViews.clear();
         serverList.removeAllViews();
         List<ServerEntry> entries = ServerStore.load(this);
-
-        emptyState.setVisibility(entries.isEmpty() ? View.VISIBLE : View.GONE);
-        if (entries.isEmpty()) {
-            subtitle.setText("серверы в кармане");
-        } else {
-            boolean hasJava = false;
-            boolean hasBedrock = false;
-            for (ServerEntry entry : entries) {
-                if (entry.isBedrock()) {
-                    hasBedrock = true;
-                } else {
-                    hasJava = true;
-                }
-            }
-            String editions = hasJava && hasBedrock
-                    ? "Java + Bedrock"
-                    : hasBedrock ? "Bedrock Edition" : "Java Edition";
-            subtitle.setText(entries.size() + " " + pluralServers(entries.size())
-                    + " · " + editions);
-        }
+        String query = searchInput == null
+                ? ""
+                : searchInput.getText().toString().trim().toLowerCase(Locale.ROOT);
+        int visibleCount = 0;
 
         for (int i = 0; i < entries.size(); i++) {
             ServerEntry entry = entries.get(i);
+            if (!matchesQuery(entry, query)) {
+                continue;
+            }
+
             View card = LayoutInflater.from(this).inflate(R.layout.item_server, serverList, false);
             cardViews.put(entry.id, card);
             bindCard(card, entry);
             serverList.addView(card);
-
-            card.setAlpha(0f);
-            card.setTranslationY(dp(16));
-            card.animate()
-                    .alpha(1f)
-                    .translationY(0f)
-                    .setDuration(280)
-                    .setStartDelay(i * 45L)
-                    .start();
+            if (animateCards) {
+                card.setAlpha(0f);
+                card.setTranslationY(dp(12));
+                card.animate()
+                        .alpha(1f)
+                        .translationY(0f)
+                        .setDuration(220)
+                        .setStartDelay(visibleCount * 35L)
+                        .start();
+            }
+            visibleCount++;
         }
+
+        TextView emptyTitle = emptyState.findViewById(R.id.emptyTitle);
+        TextView emptyMessage = emptyState.findViewById(R.id.emptyMessage);
+        boolean noServers = entries.isEmpty();
+        boolean noMatches = !noServers && visibleCount == 0;
+        emptyTitle.setText(noMatches ? "Ничего не найдено" : "Пока пусто");
+        emptyMessage.setText(noMatches
+                ? "Измени запрос — список обновляется по мере ввода"
+                : "Добавь сервер Java или Bedrock —\nпокажем онлайн и ники игроков");
+        emptyState.setVisibility(noServers || noMatches ? View.VISIBLE : View.GONE);
+        updateServerSummary(entries);
+    }
+
+    private boolean matchesQuery(ServerEntry entry, String query) {
+        if (query.isEmpty()) {
+            return true;
+        }
+        String searchable = (entry.displayName() + " " + entry.address + " "
+                + ServerEntry.normalizeProtocol(entry.protocol)).toLowerCase(Locale.ROOT);
+        if (searchable.contains(query)) {
+            return true;
+        }
+        ServerStatus status = StatusCache.load(this, entry.address);
+        if (status != null) {
+            for (String player : status.players) {
+                if (player.toLowerCase(Locale.ROOT).contains(query)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void updateServerSummary(List<ServerEntry> entries) {
+        int online = 0;
+        for (ServerEntry entry : entries) {
+            ServerStatus status = StatusCache.load(this, entry.address);
+            if (status != null && status.hasData && status.online) {
+                online++;
+            }
+        }
+        serverSummaryText.setText(entries.size() + " " + pluralServers(entries.size())
+                + " · " + online + " онлайн");
     }
 
     private void bindCard(View card, ServerEntry entry) {
@@ -453,41 +522,167 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void updateAccountButton() {
-            AccountSession session = AccountSessionStore.load(this);
-            accountButton.setText(session == null ? "Аккаунт" : session.username);
-            accountButton.setContentDescription(session == null
-                    ? "Войти и синхронизировать серверы"
-                    : "Аккаунт " + session.username + ", синхронизация серверов");
+    private void toggleSearch(View toggle) {
+        if (searchInput.getVisibility() != View.VISIBLE) {
+            searchInput.setVisibility(View.VISIBLE);
+            headerActionsSpacer.setVisibility(View.GONE);
+            searchInput.setAlpha(0f);
+            searchInput.animate().alpha(1f).setDuration(180).start();
+            searchInput.requestFocus();
+            toggle.setContentDescription("Закрыть поиск");
+            InputMethodManager input = (InputMethodManager) getSystemService(
+                    Context.INPUT_METHOD_SERVICE);
+            if (input != null) {
+                input.showSoftInput(searchInput, InputMethodManager.SHOW_IMPLICIT);
+            }
+            return;
         }
 
-        private void showAccountMenu() {
-            AccountSession session = AccountSessionStore.load(this);
-            if (session == null) {
-                String[] options = {"Войти", "Создать аккаунт"};
-                new AlertDialog.Builder(this, R.style.DialogTheme)
-                        .setTitle("Синхронизация серверов")
-                        .setItems(options, (dialog, which) -> showAccountForm(which == 1))
-                        .setNegativeButton("Отмена", null)
-                        .show();
-                return;
-            }
+        InputMethodManager input = (InputMethodManager) getSystemService(
+                Context.INPUT_METHOD_SERVICE);
+        if (input != null) {
+            input.hideSoftInputFromWindow(searchInput.getWindowToken(), 0);
+        }
+        searchInput.setText("");
+        searchInput.clearFocus();
+        searchInput.setVisibility(View.GONE);
+        searchInput.setAlpha(1f);
+        headerActionsSpacer.setVisibility(View.VISIBLE);
+        toggle.setContentDescription("Поиск серверов");
+        buildCards(false);
+    }
 
-            String[] options = {"Синхронизировать сейчас", "Выйти из аккаунта"};
+    private void updateAccountButton() {
+        AccountSession session = AccountSessionStore.load(this);
+        accountButton.setContentDescription(session == null
+                ? "Профиль: войти или создать аккаунт"
+                : "Профиль " + session.username);
+        accountButton.setSelected(session != null);
+    }
+
+    private void showAccountMenu() {
+        AccountSession session = AccountSessionStore.load(this);
+        if (session == null) {
+            String[] options = {"Войти", "Создать аккаунт"};
             new AlertDialog.Builder(this, R.style.DialogTheme)
-                    .setTitle(session.username)
-                    .setItems(options, (dialog, which) -> {
-                        if (which == 0) {
-                            requestCloudSync(false);
-                        } else {
-                            AccountSessionStore.clearSession(this);
-                            updateAccountButton();
-                            Toast.makeText(this, "Вы вышли. Локальный список сохранён.", Toast.LENGTH_SHORT).show();
-                        }
-                    })
+                    .setTitle("Аккаунт")
+                    .setItems(options, (dialog, which) -> showAccountForm(which == 1))
+                    .setNeutralButton("Настройки", (dialog, which) -> showSettingsDialog())
                     .setNegativeButton("Закрыть", null)
                     .show();
+            return;
         }
+
+        String[] options = {
+                "Профиль",
+                "Синхронизировать сейчас",
+                "Настройки",
+                "Выйти из аккаунта"
+        };
+        new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle(session.username)
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        showProfileDialog(session);
+                    } else if (which == 1) {
+                        requestCloudSync(false);
+                    } else if (which == 2) {
+                        showSettingsDialog();
+                    } else {
+                        new AlertDialog.Builder(this, R.style.DialogTheme)
+                                .setTitle("Выйти из аккаунта?")
+                                .setMessage("Локальный список серверов останется на устройстве.")
+                                .setPositiveButton("Выйти", (confirm, action) -> {
+                                    AccountSessionStore.clearSession(this);
+                                    updateAccountButton();
+                                    Toast.makeText(this, "Вы вышли из аккаунта.", Toast.LENGTH_SHORT)
+                                            .show();
+                                })
+                                .setNegativeButton("Отмена", null)
+                                .show();
+                    }
+                })
+                .setNegativeButton("Закрыть", null)
+                .show();
+    }
+
+    private void showProfileDialog(AccountSession session) {
+        int serverCount = ServerStore.load(this).size();
+        new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle(session.username)
+                .setMessage("Серверов в вашем списке: " + serverCount
+                        + "\nПубличные профили и подписки пока не подключены.")
+                .setPositiveButton("Закрыть", null)
+                .show();
+    }
+
+    private void showSettingsDialog() {
+        String[] options = {"Цвет оформления", "Аккаунт и синхронизация"};
+        new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle("Настройки")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        showAccentPicker();
+                    } else {
+                        showAccountMenu();
+                    }
+                })
+                .setNegativeButton("Закрыть", null)
+                .show();
+    }
+
+    private void showAccentPicker() {
+        String[] names = {
+                "Мятный", "Голубой", "Лавандовый", "Розовый", "Янтарный"
+        };
+        int[] colors = {
+                Color.rgb(126, 224, 163),
+                Color.rgb(126, 185, 255),
+                Color.rgb(191, 157, 255),
+                Color.rgb(255, 131, 167),
+                Color.rgb(255, 201, 120)
+        };
+        int selected = getPreferences(MODE_PRIVATE).getInt("accent_color", colors[0]);
+        int checked = 0;
+        for (int i = 0; i < colors.length; i++) {
+            if (colors[i] == selected) {
+                checked = i;
+                break;
+            }
+        }
+        new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle("Цвет оформления")
+                .setSingleChoiceItems(names, checked, (dialog, which) -> {
+                    getPreferences(MODE_PRIVATE).edit()
+                            .putInt("accent_color", colors[which])
+                            .apply();
+                    applyAccent(colors[which]);
+                    dialog.dismiss();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void applySavedAccent() {
+        int color = getPreferences(MODE_PRIVATE).getInt("accent_color", Color.rgb(126, 224, 163));
+        applyAccent(color);
+    }
+
+    private void applyAccent(int color) {
+        View addButton = findViewById(R.id.addButton);
+        int lighter = Color.rgb(
+                Color.red(color) + (255 - Color.red(color)) / 5,
+                Color.green(color) + (255 - Color.green(color)) / 5,
+                Color.blue(color) + (255 - Color.blue(color)) / 5);
+        GradientDrawable buttonBackground = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT, new int[]{lighter, color});
+        buttonBackground.setCornerRadius(dp(18));
+        addButton.setBackground(buttonBackground);
+        ((ImageView) findViewById(R.id.searchToggle)).setColorFilter(color);
+        ((ImageView) findViewById(R.id.settingsButton)).setColorFilter(color);
+        ((ImageView) findViewById(R.id.refresh)).setColorFilter(color);
+        ((BackdropView) findViewById(R.id.backdrop)).setAccentColor(color);
+    }
 
         private void showAccountForm(boolean register) {
             LinearLayout form = new LinearLayout(this);
@@ -690,7 +885,13 @@ public class MainActivity extends Activity {
         }
 
         executor.execute(() -> {
+            ServerStatus previous = StatusCache.load(getApplicationContext(), address);
             final ServerStatus status = MinecraftApi.fetch(address, protocol);
+            PriorityPlayerNotifications.notifyChanges(
+                    getApplicationContext(),
+                    ServerStore.findByAddress(getApplicationContext(), address),
+                    previous,
+                    status);
             StatusCache.save(getApplicationContext(), status);
             handler.post(() -> applyStatus(entryId, address, status));
         });
@@ -718,6 +919,7 @@ public class MainActivity extends Activity {
         if (card != null) {
             renderCard(card, current, status, false);
         }
+        updateServerSummary(ServerStore.load(this));
         WidgetUpdater.renderAll(this);
     }
 
@@ -749,7 +951,11 @@ public class MainActivity extends Activity {
         PopupMenu menu = new PopupMenu(this, anchor);
         menu.getMenu().add(0, 1, 0, "Изменить");
         menu.getMenu().add(0, 2, 1, "Добавить виджет");
-        menu.getMenu().add(0, 3, 2, "Удалить");
+        menu.getMenu().add(0, 4, 2, "Приоритеты игроков…");
+        menu.getMenu().add(0, 5, 3,
+                entry.groupId == null || entry.groupId.isEmpty()
+                        ? "Добавить в группу…" : "Группа: " + entry.groupId);
+        menu.getMenu().add(0, 3, 4, "Удалить");
         menu.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == 1) {
                 showServerDialog(entry);
@@ -763,9 +969,158 @@ public class MainActivity extends Activity {
                 confirmDelete(entry);
                 return true;
             }
+            if (item.getItemId() == 4) {
+                showPrioritiesDialog(entry);
+                return true;
+            }
+            if (item.getItemId() == 5) {
+                showGroupDialog(entry);
+                return true;
+            }
             return false;
         });
         menu.show();
+    }
+
+    private void showPrioritiesDialog(ServerEntry entry) {
+        EditText input = new EditText(this);
+        input.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        input.setMinLines(4);
+        input.setMaxLines(8);
+        input.setHint("Например:\nNotch\nJeb_\nDinnerbone");
+        input.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        if (entry.priorityPlayers != null) {
+            input.setText(TextUtils.join("\n", entry.priorityPlayers));
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle("Приоритеты · " + entry.displayName())
+                .setMessage("Уведомления о входе и выходе будут только для этих ников.")
+                .setView(input)
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Сохранить", null)
+                .create();
+        dialog.setOnShowListener(ignored -> {
+            Button save = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            save.setTextColor(getColor(R.color.mint));
+            save.setOnClickListener(v -> {
+                List<String> names = new java.util.ArrayList<>();
+                java.util.Set<String> seen = new java.util.HashSet<>();
+                String raw = input.getText().toString().replace(",", "\n");
+                for (String line : raw.split("\\R")) {
+                    String name = line.trim();
+                    if (name.isEmpty()) {
+                        continue;
+                    }
+                    if (name.length() > 32 || name.matches(".*\\s+.*")) {
+                        input.setError("Ник до 32 символов, без пробелов");
+                        return;
+                    }
+                    if (names.size() >= 50) {
+                        input.setError("Можно отслеживать не больше 50 ников");
+                        return;
+                    }
+                    if (seen.add(name.toLowerCase(Locale.ROOT))) {
+                        names.add(name);
+                    }
+                }
+                entry.priorityPlayers = names;
+                ServerStore.saveEntry(this, entry);
+                requestCloudSync(true);
+                if (!names.isEmpty() && Build.VERSION.SDK_INT >= 33
+                        && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(
+                            new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
+                            REQUEST_NOTIFICATIONS);
+                }
+                dialog.dismiss();
+                Toast.makeText(this, names.isEmpty()
+                        ? "Отслеживание игроков выключено"
+                        : "Приоритеты сохранены и синхронизируются",
+                        Toast.LENGTH_SHORT).show();
+            });
+        });
+        dialog.show();
+    }
+
+    private void showGroupDialog(ServerEntry entry) {
+        List<String> groups = new java.util.ArrayList<>();
+        for (ServerEntry server : ServerStore.load(this)) {
+            String group = server.groupId == null ? "" : server.groupId.trim();
+            if (!group.isEmpty() && !containsIgnoreCase(groups, group)) {
+                groups.add(group);
+            }
+        }
+        List<String> options = new java.util.ArrayList<>();
+        options.add("Без группы");
+        options.addAll(groups);
+        options.add("＋ Создать новую группу");
+        String[] labels = options.toArray(new String[0]);
+        new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle("Группа серверов")
+                .setItems(labels, (dialog, which) -> {
+                    if (which == labels.length - 1) {
+                        showCreateGroupDialog(entry, groups);
+                    } else {
+                        saveGroup(entry, which == 0 ? "" : groups.get(which - 1));
+                    }
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void showCreateGroupDialog(ServerEntry entry, List<String> existingGroups) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Название группы");
+        AlertDialog dialog = new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle("Новая группа")
+                .setView(input)
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Создать", null)
+                .create();
+        dialog.setOnShowListener(ignored -> {
+            Button create = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            create.setTextColor(getColor(R.color.mint));
+            create.setOnClickListener(v -> {
+                String name = input.getText().toString().trim();
+                if (name.isEmpty() || name.length() > 60) {
+                    input.setError("Название должно содержать 1–60 символов");
+                    return;
+                }
+                String selected = name;
+                for (String existing : existingGroups) {
+                    if (existing.equalsIgnoreCase(name)) {
+                        selected = existing;
+                        break;
+                    }
+                }
+                saveGroup(entry, selected);
+                dialog.dismiss();
+            });
+        });
+        dialog.show();
+    }
+
+    private boolean containsIgnoreCase(List<String> values, String candidate) {
+        for (String value : values) {
+            if (value.equalsIgnoreCase(candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void saveGroup(ServerEntry entry, String groupId) {
+        entry.groupId = groupId;
+        ServerStore.saveEntry(this, entry);
+        requestCloudSync(true);
+        Toast.makeText(this,
+                groupId.isEmpty() ? "Сервер убран из группы" : "Сервер добавлен в группу " + groupId,
+                Toast.LENGTH_SHORT).show();
     }
 
     private void showServerDialog(ServerEntry entry) {

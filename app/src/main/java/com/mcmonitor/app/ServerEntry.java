@@ -1,9 +1,12 @@
 package com.mcmonitor.app;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /** Один Java-сервер в списке приложения. */
@@ -20,6 +23,9 @@ public class ServerEntry {
     /** Имя, которое мы вытащили из MOTD. */
     public String autoName;
     public String protocol;
+    public String groupId;
+    public boolean showInWidget;
+    public List<String> priorityPlayers;
 
     public ServerEntry() {
         id = UUID.randomUUID().toString();
@@ -27,6 +33,8 @@ public class ServerEntry {
         name = "";
         autoName = "";
         protocol = PROTOCOL_JAVA;
+        groupId = "";
+        priorityPlayers = new ArrayList<>();
     }
 
     public ServerEntry(String address, String name) {
@@ -102,6 +110,17 @@ public class ServerEntry {
         json.put("name", name == null ? "" : name);
         json.put("autoName", autoName == null ? "" : autoName);
         json.put("protocol", normalizeProtocol(protocol));
+        json.put("group_id", groupId == null ? "" : groupId);
+        json.put("show_in_widget", showInWidget);
+        JSONArray priorities = new JSONArray();
+        if (priorityPlayers != null) {
+            for (String player : priorityPlayers) {
+                if (player != null && !player.trim().isEmpty()) {
+                    priorities.put(player.trim());
+                }
+            }
+        }
+        json.put("priority_players", priorities);
         return json;
     }
 
@@ -115,6 +134,24 @@ public class ServerEntry {
         entry.name = json.optString("name", "");
         entry.autoName = json.optString("autoName", "");
         entry.protocol = normalizeProtocol(json.optString("protocol", PROTOCOL_JAVA));
+        entry.groupId = json.optString("group_id", "");
+        entry.showInWidget = json.optBoolean("show_in_widget", false);
+        JSONArray priorities = json.optJSONArray("priority_players");
+        if (priorities != null) {
+            for (int i = 0; i < priorities.length(); i++) {
+                String player = priorities.optString(i, "").trim();
+                boolean duplicate = false;
+                for (String existing : entry.priorityPlayers) {
+                    if (existing.equalsIgnoreCase(player)) {
+                        duplicate = true;
+                        break;
+                    }
+                }
+                if (!player.isEmpty() && player.length() <= 32 && !duplicate) {
+                    entry.priorityPlayers.add(player);
+                }
+            }
+        }
         if (entry.address.isEmpty()) {
             return null;
         }

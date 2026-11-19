@@ -188,8 +188,10 @@ public final class WidgetUpdater {
                 return;
             }
             ServerEntry server = ServerStore.findByAddress(app, address);
+            ServerStatus previous = StatusCache.load(app, address);
             ServerStatus status = server == null
                     ? MinecraftApi.fetch(address) : MinecraftApi.fetch(server);
+            PriorityPlayerNotifications.notifyChanges(app, server, previous, status);
             StatusCache.save(app, status);
         }
         if (Thread.currentThread().isInterrupted()) {

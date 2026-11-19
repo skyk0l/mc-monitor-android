@@ -163,7 +163,10 @@ public final class CloudSyncClient {
                 && (first.name == null ? "" : first.name)
                 .equals(second.name == null ? "" : second.name)
                 && ServerEntry.normalizeProtocol(first.protocol)
-                .equals(ServerEntry.normalizeProtocol(second.protocol));
+                .equals(ServerEntry.normalizeProtocol(second.protocol))
+                && first.showInWidget == second.showInWidget
+                && safe(first.groupId).equals(safe(second.groupId))
+                && prioritiesEqual(first.priorityPlayers, second.priorityPlayers);
     }
 
     private static ServerEntry copy(ServerEntry entry) {
@@ -171,6 +174,10 @@ public final class CloudSyncClient {
         copy.id = entry.id;
         copy.autoName = entry.autoName;
         copy.protocol = ServerEntry.normalizeProtocol(entry.protocol);
+        copy.showInWidget = entry.showInWidget;
+        copy.groupId = safe(entry.groupId);
+        copy.priorityPlayers = new ArrayList<>(
+                entry.priorityPlayers == null ? new ArrayList<>() : entry.priorityPlayers);
         return copy;
     }
 
@@ -191,6 +198,20 @@ public final class CloudSyncClient {
             ServerEntry entry = new ServerEntry(address, json.optString("name", ""));
             entry.protocol = ServerEntry.normalizeProtocol(
                     json.optString("protocol", ServerEntry.PROTOCOL_JAVA));
+            entry.showInWidget = json.optBoolean("show_in_widget", false);
+            Object rawGroupId = json.opt("group_id");
+            entry.groupId = rawGroupId == null || JSONObject.NULL.equals(rawGroupId)
+                    ? "" : rawGroupId.toString();
+            JSONArray priorities = json.optJSONArray("priority_players");
+            if (priorities != null) {
+                for (int j = 0; j < priorities.length(); j++) {
+                    String player = priorities.optString(j, "").trim();
+                    if (!player.isEmpty() && player.length() <= 32
+                            && !containsIgnoreCase(entry.priorityPlayers, player)) {
+                        entry.priorityPlayers.add(player);
+                    }
+                }
+            }
             result.add(entry);
         }
         return result;
@@ -203,9 +224,47 @@ public final class CloudSyncClient {
             json.put("address", ServerEntry.normalize(entry.address));
             json.put("name", entry.displayName());
             json.put("protocol", ServerEntry.normalizeProtocol(entry.protocol));
+            json.put("show_in_widget", entry.showInWidget);
+            json.put("group_id", safe(entry.groupId));
+            JSONArray priorities = new JSONArray();
+            if (entry.priorityPlayers != null) {
+                for (String player : entry.priorityPlayers) {
+                    if (player != null && !player.trim().isEmpty()) {
+                        priorities.put(player.trim());
+                    }
+                }
+            }
+            json.put("priority_players", priorities);
             array.put(json);
         }
         return array;
+    }
+
+    private static String safe(String value) {
+        return value == null ? "" : value;
+    }
+
+    private static boolean containsIgnoreCase(List<String> values, String candidate) {
+        for (String value : values) {
+            if (value.equalsIgnoreCase(candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean prioritiesEqual(List<String> first, List<String> second) {
+        List<String> left = first == null ? new ArrayList<>() : first;
+        List<String> right = second == null ? new ArrayList<>() : second;
+        if (left.size() != right.size()) {
+            return false;
+        }
+        for (int i = 0; i < left.size(); i++) {
+            if (!left.get(i).equalsIgnoreCase(right.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static AccountSession sessionFrom(JSONObject response, String fallbackUsername)

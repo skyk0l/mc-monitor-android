@@ -5,6 +5,7 @@
     android:layout_height="match_parent">
 
     <com.mcmonitor.app.BackdropView
+        android:id="@+id/backdrop"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
@@ -26,50 +27,140 @@
 
         <ImageView
             android:id="@+id/title"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_width="240dp"
+            android:layout_height="42dp"
+            android:layout_gravity="center_horizontal"
             android:contentDescription="@string/app_name"
             android:scaleType="fitCenter"
             android:src="@drawable/mcm_logo" />
 
         <TextView
             android:id="@+id/subtitle"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="2dp"
-            android:text="серверы в кармане"
-            android:textColor="@color/dim"
-            android:textSize="12sp" />
+            android:layout_marginTop="3dp"
+            android:gravity="center"
+            android:letterSpacing="0.13"
+            android:text="JAVA + BEDROCK  ·  МОНИТОРИНГ СЕРВЕРОВ"
+            android:textColor="@color/soft"
+            android:textSize="9sp" />
 
-        <FrameLayout
+        <LinearLayout
+            android:id="@+id/headerActions"
             android:layout_width="match_parent"
             android:layout_height="44dp"
-            android:layout_marginTop="2dp">
-            <TextView
-                android:id="@+id/accountButton"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:layout_gravity="start|center_vertical"
+            android:layout_marginTop="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageButton
+                android:id="@+id/searchToggle"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:background="@drawable/bg_input"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
+                android:contentDescription="Поиск серверов"
+                android:padding="10dp"
+                android:src="@drawable/ic_search"
+                android:tint="@color/soft" />
+
+            <EditText
+                android:id="@+id/searchInput"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="7dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_input"
+                android:hint="Поиск серверов"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:maxLines="1"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
-                android:text="@string/account_button"
-                android:textColor="@color/soft"
-                android:textSize="12sp" />
+                android:singleLine="true"
+                android:textColor="@color/text"
+                android:textColorHint="@color/dim"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <Space
+                android:id="@+id/headerActionsSpacer"
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <ImageButton
+                android:id="@+id/accountButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_avatar"
+                android:clickable="true"
+                android:contentDescription="Профиль и аккаунт"
+                android:focusable="true"
+                android:padding="10dp"
+                android:src="@drawable/ic_profile"
+                android:tint="@color/soft" />
+
+            <ImageButton
+                android:id="@+id/settingsButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="7dp"
+                android:background="@drawable/bg_input"
+                android:contentDescription="Настройки"
+                android:padding="10dp"
+                android:src="@drawable/ic_settings"
+                android:tint="@color/soft" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/serverSummary"
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_card"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingEnd="8dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.06"
+                    android:text="МОИ СЕРВЕРЫ"
+                    android:textColor="@color/text"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/serverSummaryText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="0 серверов · 0 онлайн"
+                    android:textColor="@color/soft"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
             <ImageButton
                 android:id="@+id/refresh"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:layout_gravity="end|center_vertical"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_input"
                 android:contentDescription="Обновить"
-                android:padding="9dp"
+                android:padding="10dp"
                 android:src="@drawable/ic_refresh" />
-        </FrameLayout>
+        </LinearLayout>
 
         <ScrollView
             android:id="@+id/scroll"
@@ -78,7 +169,7 @@
             android:layout_weight="1"
             android:clipToPadding="false"
             android:fillViewport="true"
-            android:paddingTop="4dp"
+            android:paddingTop="10dp"
             android:paddingBottom="8dp"
             android:scrollbars="none">
 
@@ -99,7 +190,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center_horizontal"
                     android:orientation="vertical"
-                    android:paddingTop="76dp"
+                    android:paddingTop="54dp"
                     android:paddingBottom="40dp"
                     android:visibility="gone">
 
@@ -110,6 +201,7 @@
                         android:textSize="46sp" />
 
                     <TextView
+                        android:id="@+id/emptyTitle"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="14dp"
@@ -119,6 +211,7 @@
                         android:textSize="20sp" />
 
                     <TextView
+                        android:id="@+id/emptyMessage"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
