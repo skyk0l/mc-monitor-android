@@ -31,6 +31,7 @@ public final class WidgetUpdater {
     private static final int COLOR_MINT = 0xFFA7C6A4;
     private static final int COLOR_CORAL = 0xFFD0A09B;
     private static final int COLOR_AMBER = 0xFFC9BB98;
+    private static final int[] WIDGET_BACKGROUNDS = WidgetSettingsStore.BACKGROUNDS;
 
     private WidgetUpdater() {
     }
@@ -222,6 +223,12 @@ public final class WidgetUpdater {
 
         boolean known = status != null && status.hasData;
         boolean online = known && status.online;
+        int accent = WidgetSettingsStore.accent(context);
+        int backgroundIndex = WidgetSettingsStore.background(context);
+        if (backgroundIndex < 0 || backgroundIndex >= WIDGET_BACKGROUNDS.length) {
+            backgroundIndex = 0;
+        }
+        views.setInt(R.id.wRoot, "setBackgroundColor", WIDGET_BACKGROUNDS[backgroundIndex]);
 
         Bitmap icon = decodeServerIcon(status);
         if (icon != null) {
@@ -232,28 +239,49 @@ public final class WidgetUpdater {
         views.setTextViewText(R.id.wName, name);
         views.setTextViewText(R.id.wCount,
                 !known ? "—" : online ? String.valueOf(status.onlineCount) : "—");
-        views.setTextColor(R.id.wCount, known && online ? COLOR_MINT : COLOR_TEXT);
+        views.setTextColor(R.id.wCount, known && online ? accent : COLOR_TEXT);
         views.setTextViewText(R.id.wMax,
                 known && online && status.maxCount > 0 ? "/ " + status.maxCount : "");
-        views.setTextColor(R.id.wDot, statusColor(status, refreshing));
+        views.setViewVisibility(R.id.wName,
+                WidgetSettingsStore.showName(context) ? android.view.View.VISIBLE : android.view.View.GONE);
+        views.setTextColor(R.id.wRefresh, accent);
 
-        if (kind == KIND_2X1) {
-            views.setTextViewText(R.id.wPlayersEmpty, compactPlayersText(status));
-        } else {
+        if (kind != KIND_2X1) {
+            views.setTextColor(R.id.wDot, statusColor(status, refreshing));
             views.setTextViewText(R.id.wStatus, statusText(status, refreshing));
             views.setTextColor(R.id.wStatus, statusColor(status, refreshing));
+            views.setViewVisibility(R.id.wStatus, android.view.View.VISIBLE);
         }
 
         if (kind == KIND_3X3) {
             views.setTextViewText(R.id.wAddress, address);
             views.setTextViewText(R.id.wLastUpdated, updatedText(context, status));
             views.setTextViewText(R.id.wVersion, versionText(status, server));
+            views.setTextColor(R.id.wPlayersLabel, accent);
             views.setTextViewText(R.id.wPlayersLabel,
                     known && online ? "ИГРОКИ · " + status.onlineCount : "ИГРОКИ");
             views.setTextViewText(R.id.wPlayersEmpty, playersText(status, 9));
+            views.setViewVisibility(R.id.wPlayersLabel,
+                    WidgetSettingsStore.showPlayers(context)
+                            ? android.view.View.VISIBLE : android.view.View.GONE);
+            views.setViewVisibility(R.id.wPlayersEmpty,
+                    WidgetSettingsStore.showPlayers(context)
+                            ? android.view.View.VISIBLE : android.view.View.GONE);
+            views.setViewVisibility(R.id.wVersion,
+                    WidgetSettingsStore.showVersion(context)
+                            ? android.view.View.VISIBLE : android.view.View.GONE);
+            views.setViewVisibility(R.id.wLastUpdated,
+                    WidgetSettingsStore.showUpdated(context)
+                            ? android.view.View.VISIBLE : android.view.View.GONE);
         } else if (kind == KIND_2X2) {
-            views.setTextViewText(R.id.wLastUpdated, updatedTime(context, status));
-            views.setTextViewText(R.id.wVersion, versionText(status, server));
+            views.setTextColor(R.id.wPlayersLabel, accent);
+            views.setTextViewText(R.id.wPlayersEmpty, playersText(status, 2));
+            views.setViewVisibility(R.id.wPlayersLabel,
+                    WidgetSettingsStore.showPlayers(context)
+                            ? android.view.View.VISIBLE : android.view.View.GONE);
+            views.setViewVisibility(R.id.wPlayersEmpty,
+                    WidgetSettingsStore.showPlayers(context)
+                            ? android.view.View.VISIBLE : android.view.View.GONE);
         }
 
         Intent openIntent = new Intent(context, MainActivity.class)
@@ -304,13 +332,6 @@ public final class WidgetUpdater {
         }
         return "обновлено "
                 + DateFormat.getTimeFormat(context).format(new Date(status.updatedAt));
-    }
-
-    private static String updatedTime(Context context, ServerStatus status) {
-        if (status == null || status.updatedAt <= 0L) {
-            return "—";
-        }
-        return DateFormat.getTimeFormat(context).format(new Date(status.updatedAt));
     }
 
     private static Bitmap decodeServerIcon(ServerStatus status) {
@@ -385,13 +406,4 @@ public final class WidgetUpdater {
         return builder.toString();
     }
 
-    private static String compactPlayersText(ServerStatus status) {
-        if (status == null || !status.hasData) {
-            return "—";
-        }
-        if (!status.online) {
-            return "офлайн";
-        }
-        return status.players.isEmpty() ? "нет ников" : status.players.get(0);
-    }
 }

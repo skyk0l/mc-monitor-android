@@ -31,6 +31,7 @@ import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
+import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
@@ -140,7 +141,8 @@ public class MainActivity extends Activity {
         searchInput = findViewById(R.id.searchInput);
         headerActionsSpacer = findViewById(R.id.headerActionsSpacer);
         findViewById(R.id.searchToggle).setOnClickListener(this::toggleSearch);
-        findViewById(R.id.settingsButton).setOnClickListener(v -> showSettingsDialog());
+        findViewById(R.id.settingsButton).setOnClickListener(v ->
+                startActivity(new Intent(this, SettingsActivity.class)));
         searchInput.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence value, int start, int count, int after) {
@@ -154,6 +156,13 @@ public class MainActivity extends Activity {
             @Override
             public void afterTextChanged(Editable value) {
             }
+        });
+        searchInput.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                openCommunitySearch();
+                return true;
+            }
+            return false;
         });
 
         applyWindowInsets();
@@ -221,6 +230,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        applySavedAccent();
         refreshAll();
         requestCloudSync(true);
         handler.removeCallbacks(autoRefresh);
@@ -568,6 +578,28 @@ public class MainActivity extends Activity {
         buildCards(false);
     }
 
+    private void openCommunitySearch() {
+        String query = searchInput.getText().toString().trim();
+        if (query.length() < 2) {
+            Toast.makeText(this, "Для поиска сообщества введи хотя бы 2 символа.",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        InputMethodManager input = (InputMethodManager) getSystemService(
+                Context.INPUT_METHOD_SERVICE);
+        if (input != null) {
+            input.hideSoftInputFromWindow(searchInput.getWindowToken(), 0);
+        }
+        AccountSession session = AccountSessionStore.load(this);
+        if (session == null) {
+            Toast.makeText(this, "Войди в аккаунт, чтобы искать серверы и игроков сообщества.",
+                    Toast.LENGTH_LONG).show();
+            showAccountMenu();
+            return;
+        }
+        showCommunityDialog(session, false, query, 1);
+    }
+
     private void updateAccountButton() {
         AccountSession session = AccountSessionStore.load(this);
         accountButton.setContentDescription(session == null
@@ -583,7 +615,6 @@ public class MainActivity extends Activity {
             new AlertDialog.Builder(this, R.style.DialogTheme)
                     .setTitle("Аккаунт")
                     .setItems(options, (dialog, which) -> showAccountForm(which == 1))
-                    .setNeutralButton("Настройки", (dialog, which) -> showSettingsDialog())
                     .setNegativeButton("Закрыть", null)
                     .show();
             return;
@@ -594,7 +625,6 @@ public class MainActivity extends Activity {
                 "Поиск игроков и серверов",
                 "Мои подписки",
                 "Синхронизировать сейчас",
-                "Настройки",
                 "Выйти из аккаунта"
         };
         new AlertDialog.Builder(this, R.style.DialogTheme)
@@ -608,8 +638,6 @@ public class MainActivity extends Activity {
                         showCommunityDialog(session, true);
                     } else if (which == 3) {
                         requestCloudSync(false);
-                    } else if (which == 4) {
-                        showSettingsDialog();
                     } else {
                         new AlertDialog.Builder(this, R.style.DialogTheme)
                                 .setTitle("Выйти из аккаунта?")
@@ -866,6 +894,11 @@ public class MainActivity extends Activity {
     }
 
     private void showCommunityDialog(AccountSession session, boolean followedOnly) {
+        showCommunityDialog(session, followedOnly, "", followedOnly ? 2 : 0);
+    }
+
+    private void showCommunityDialog(
+            AccountSession session, boolean followedOnly, String initialQuery, int initialMode) {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         int padding = dp(18);
@@ -910,8 +943,9 @@ public class MainActivity extends Activity {
             communityRequestId++;
         });
         communityDialog.show();
-        communityMode = followedOnly ? 2 : 0;
+        communityMode = followedOnly ? 2 : initialMode;
         communitySearch.setVisibility(followedOnly ? View.GONE : View.VISIBLE);
+        communitySearch.setText(initialQuery);
         communitySearch.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence value, int start, int count, int after) {
@@ -940,9 +974,6 @@ public class MainActivity extends Activity {
         communityMode = mode;
         if (communitySearch != null) {
             communitySearch.setVisibility(mode == 2 ? View.GONE : View.VISIBLE);
-            if (mode != 2) {
-                communitySearch.setText("");
-            }
         }
         loadCommunity(session);
     }
@@ -1182,55 +1213,9 @@ public class MainActivity extends Activity {
         Toast.makeText(this, "Сервер добавлен.", Toast.LENGTH_SHORT).show();
     }
 
-    private void showSettingsDialog() {
-        String[] options = {"Цвет оформления", "Аккаунт и синхронизация"};
-        new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("Настройки")
-                .setItems(options, (dialog, which) -> {
-                    if (which == 0) {
-                        showAccentPicker();
-                    } else {
-                        showAccountMenu();
-                    }
-                })
-                .setNegativeButton("Закрыть", null)
-                .show();
-    }
-
-    private void showAccentPicker() {
-        String[] names = {
-                "Мятный", "Голубой", "Лавандовый", "Розовый", "Янтарный"
-        };
-        int[] colors = {
-                Color.rgb(126, 224, 163),
-                Color.rgb(126, 185, 255),
-                Color.rgb(191, 157, 255),
-                Color.rgb(255, 131, 167),
-                Color.rgb(255, 201, 120)
-        };
-        int selected = getPreferences(MODE_PRIVATE).getInt("accent_color", colors[0]);
-        int checked = 0;
-        for (int i = 0; i < colors.length; i++) {
-            if (colors[i] == selected) {
-                checked = i;
-                break;
-            }
-        }
-        new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("Цвет оформления")
-                .setSingleChoiceItems(names, checked, (dialog, which) -> {
-                    getPreferences(MODE_PRIVATE).edit()
-                            .putInt("accent_color", colors[which])
-                            .apply();
-                    applyAccent(colors[which]);
-                    dialog.dismiss();
-                })
-                .setNegativeButton("Отмена", null)
-                .show();
-    }
-
     private void applySavedAccent() {
-        int color = getPreferences(MODE_PRIVATE).getInt("accent_color", Color.rgb(126, 224, 163));
+        int color = getSharedPreferences("app_settings", MODE_PRIVATE)
+                .getInt("accent_color", Color.rgb(126, 224, 163));
         applyAccent(color);
     }
 
