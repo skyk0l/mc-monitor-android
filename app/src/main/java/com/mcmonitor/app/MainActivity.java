@@ -56,6 +56,11 @@ public class MainActivity extends Activity {
 
     private static final String TAG = "MCMonitor";
     private static final int REQUEST_NOTIFICATIONS = 7102;
+    private static final String APP_SETTINGS = "app_settings";
+    private static final String NOTIFICATION_PERMISSION_ASKED =
+            "priority_notification_permission_asked";
+    private static final String NOTIFICATION_SETTINGS_PROMPTED =
+            "priority_notification_settings_prompted";
 
     private static final long REFRESH_INTERVAL = 60_000L;
     private static final long CLOUD_SYNC_INTERVAL = 5 * 60_000L;
@@ -221,6 +226,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         applySavedAccent();
+        ensurePriorityNotificationPermission();
         WidgetJobService.schedule(this);
         refreshAll();
         requestCloudSync(true);
@@ -246,16 +252,22 @@ public class MainActivity extends Activity {
         }
         if (grantResults.length > 0
                 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(
-                    this, "Уведомления о приоритетных игроках включены.", Toast.LENGTH_SHORT).show();
-            WidgetJobService.schedule(this);
-            WidgetJobService.requestRefresh(this);
-            return;
+            if (arePriorityNotificationsEnabled()) {
+                Toast.makeText(
+                        this,
+                        "Уведомления о приоритетных игроках включены.",
+                        Toast.LENGTH_SHORT).show();
+                WidgetJobService.schedule(this);
+                WidgetJobService.requestRefresh(this);
+                return;
+            }
         }
         showNotificationSettingsPrompt();
     }
 
     private void showNotificationSettingsPrompt() {
+        getSharedPreferences(APP_SETTINGS, MODE_PRIVATE)
+                .edit().putBoolean(NOTIFICATION_SETTINGS_PROMPTED, true).apply();
         new AlertDialog.Builder(this, R.style.DialogTheme)
                 .setTitle("Уведомления отключены")
                 .setMessage("Разреши уведомления для MC Monitor в настройках Android, "
@@ -1242,7 +1254,7 @@ public class MainActivity extends Activity {
     }
 
     private void applySavedAccent() {
-        int color = getSharedPreferences("app_settings", MODE_PRIVATE)
+        int color = getSharedPreferences(APP_SETTINGS, MODE_PRIVATE)
                 .getInt("accent_color", Color.rgb(126, 224, 163));
         applyAccent(color);
     }
@@ -1332,6 +1344,7 @@ public class MainActivity extends Activity {
                         updateAccountButton();
                         accountButton.setEnabled(true);
                         buildCards();
+                        ensurePriorityNotificationPermission();
                         Toast.makeText(
                                 this,
                                 "Синхронизировано серверов: " + serverCount,
@@ -1376,6 +1389,7 @@ public class MainActivity extends Activity {
                         handler.post(() -> {
                             updateAccountButton();
                             buildCards();
+                            ensurePriorityNotificationPermission();
                             if (showMessage) {
                                 Toast.makeText(
                                         this,
@@ -1620,6 +1634,13 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                 != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            android.content.SharedPreferences preferences =
+                    getSharedPreferences(APP_SETTINGS, MODE_PRIVATE);
+            if (preferences.getBoolean(NOTIFICATION_PERMISSION_ASKED, false)) {
+                showNotificationSettingsPrompt();
+                return;
+            }
+            preferences.edit().putBoolean(NOTIFICATION_PERMISSION_ASKED, true).apply();
             requestPermissions(
                     new String[]{android.Manifest.permission.POST_NOTIFICATIONS},
                     REQUEST_NOTIFICATIONS);
@@ -1627,6 +1648,37 @@ public class MainActivity extends Activity {
         }
         if (!arePriorityNotificationsEnabled()) {
             showNotificationSettingsPrompt();
+        }
+    }
+
+    private void ensurePriorityNotificationPermission() {
+        boolean hasPriorities = false;
+        for (ServerEntry server : ServerStore.load(this)) {
+            if (server.priorityPlayers != null && !server.priorityPlayers.isEmpty()) {
+                hasPriorities = true;
+                break;
+            }
+        }
+        if (!hasPriorities) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            android.content.SharedPreferences preferences =
+                    getSharedPreferences(APP_SETTINGS, MODE_PRIVATE);
+            if (!preferences.getBoolean(NOTIFICATION_PERMISSION_ASKED, false)) {
+                requestPriorityNotificationPermission();
+            }
+            return;
+        }
+        if (!arePriorityNotificationsEnabled()) {
+            android.content.SharedPreferences preferences =
+                    getSharedPreferences(APP_SETTINGS, MODE_PRIVATE);
+            if (!preferences.getBoolean(NOTIFICATION_SETTINGS_PROMPTED, false)) {
+                preferences.edit().putBoolean(NOTIFICATION_SETTINGS_PROMPTED, true).apply();
+                showNotificationSettingsPrompt();
+            }
         }
     }
 
