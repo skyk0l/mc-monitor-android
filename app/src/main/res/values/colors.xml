@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg_top">#10121A</color>
+    <color name="bg_bottom">#1B1F2B</color>
+    <color name="text">#EEF2F8</color>
+    <color name="soft">#AAB3C4</color>
+    <color name="dim">#747C8D</color>
+    <color name="mint">#7EE0A3</color>
+    <color name="coral">#FF8391</color>
+    <color name="amber">#FFC978</color>
+    <color name="widget_bg">#F5252B30</color>
+    <color name="widget_stroke">#387F927E</color>
+    <color name="widget_text">#E6E9E5</color>
+    <color name="widget_soft">#ADB7B2</color>
+    <color name="widget_dim">#83908A</color>
+    <color name="widget_accent">#A7C6A4</color>
+    <color name="widget_offline">#D0A09B</color>
+    <color name="widget_waiting">#C9BB98</color>
+    <color name="chip_text1">#BDF3CE</color>
+    <color name="chip_text2">#CBE0FF</color>
+    <color name="chip_text3">#E3D4FF</color>
+    <color name="chip_text4">#FFD5DE</color>
+    <color name="launcher_bg">#12151F</color>
+    <color name="status_bar">#FF454A52</color>
+</resources>

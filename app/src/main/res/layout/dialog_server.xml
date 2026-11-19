@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-medium"
+        android:text="Издание Minecraft"
+        android:textColor="@color/soft"
+        android:textSize="11sp" />
+
+    <Spinner
+        android:id="@+id/protocolInput"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_input"
+        android:paddingStart="13dp"
+        android:paddingEnd="13dp"
+        android:spinnerMode="dropdown" />
+
+    <TextView
+        android:id="@+id/nameLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:fontFamily="sans-serif-medium"
+        android:text="Название"
+        android:textColor="@color/soft"
+        android:textSize="11sp" />
+
+    <EditText
+        android:id="@+id/nameInput"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_input"
+        android:hint="Пусто — возьмём из MOTD"
+        android:inputType="textCapSentences"
+        android:maxLines="1"
+        android:paddingStart="13dp"
+        android:paddingEnd="13dp"
+        android:singleLine="true"
+        android:textColor="@color/text"
+        android:textColorHint="@color/dim"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/addressLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:fontFamily="sans-serif-medium"
+        android:text="IP сервера"
+        android:textColor="@color/soft"
+        android:textSize="11sp" />
+
+    <EditText
+        android:id="@+id/addressInput"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_input"
+        android:hint="mc.example.com или host:25565"
+        android:inputType="textNoSuggestions"
+        android:maxLines="1"
+        android:paddingStart="13dp"
+        android:paddingEnd="13dp"
+        android:singleLine="true"
+        android:textColor="@color/text"
+        android:textColorHint="@color/dim"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/protocolHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Java Edition · порт по умолчанию 25565"
+        android:textColor="@color/dim"
+        android:textSize="10sp" />
+</LinearLayout>

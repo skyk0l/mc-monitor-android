@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MC Monitor</string>
+    <string name="account_button">Аккаунт</string>
+    <string name="account_recovery_note">Без email восстановить забытый пароль нельзя.</string>
+    <string name="widget_desc_2x2">Компактный виджет: онлайн и версия сервера</string>
+    <string name="widget_desc_2x1">Мини-виджет: онлайн и статус сервера</string>
+    <string name="widget_desc_3x3">Сервер и список игроков</string>
+</resources>
