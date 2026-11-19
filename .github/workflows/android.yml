@@ -27,6 +27,13 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      - name: Check release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version="$(sed -n 's/^[[:space:]]*versionName "\(.*\)"/\1/p' app/build.gradle)"
+          test "${GITHUB_REF_NAME}" = "v${version}"
+
       - name: Build and lint debug app
         run: |
           chmod +x gradlew

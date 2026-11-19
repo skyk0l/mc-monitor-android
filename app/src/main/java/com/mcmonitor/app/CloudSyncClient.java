@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 /** Supabase Auth and row-level-secured server-list storage. */
 public final class CloudSyncClient {
@@ -85,6 +86,362 @@ public final class CloudSyncClient {
                 body,
                 session,
                 "resolution=merge-duplicates,return=minimal");
+    }
+
+    public static PublicProfile fetchProfile(AccountSession session)
+            throws IOException, JSONException {
+        String userId = encode(session.userId);
+        JSONArray rows = new JSONArray(requestWithSession(
+                "/rest/v1/profiles?select=id,username,display_name,bio,avatar_path,share_servers"
+                        + "&id=eq." + userId,
+                "GET",
+                null,
+                session,
+                null));
+        if (rows.length() == 0 || rows.optJSONObject(0) == null) {
+            throw new IOException(
+                    "Профиль не найден. Проверь, что миграция профилей применена.");
+        }
+        return profileFrom(rows.optJSONObject(0));
+    }
+
+    public static PublicProfile updateProfile(
+            AccountSession session,
+            String displayName,
+            String bio,
+            boolean shareServers) throws IOException, JSONException {
+        String cleanName = displayName == null ? "" : displayName.trim();
+        String cleanBio = bio == null ? "" : bio.trim();
+        if (cleanName.length() > 32) {
+            throw new IllegalArgumentException(
+                    "Отображаемое имя должно быть не длиннее 32 символов.");
+        }
+        if (cleanBio.length() > 160) {
+            throw new IllegalArgumentException(
+                    "Описание профиля должно быть не длиннее 160 символов.");
+        }
+        JSONObject body = new JSONObject();
+        body.put("display_name", cleanName);
+        body.put("bio", cleanBio);
+        body.put("share_servers", shareServers);
+        JSONArray rows = new JSONArray(requestWithSession(
+                "/rest/v1/profiles?id=eq." + encode(session.userId),
+                "PATCH",
+                body,
+                session,
+                "return=representation"));
+        if (rows.length() == 0 || rows.optJSONObject(0) == null) {
+            throw new IOException("Не удалось сохранить профиль. Проверь права Supabase.");
+        }
+        return profileFrom(rows.optJSONObject(0));
+    }
+
+    public static List<PublicProfile> searchProfiles(
+            AccountSession session, String query) throws IOException, JSONException {
+        String term = validateSearchTerm(query);
+        JSONObject body = new JSONObject();
+        body.put("search_term", term);
+        body.put("result_limit", 20);
+        return parseProfiles(requestWithSession(
+                "/rest/v1/rpc/search_public_profiles", "POST", body, session, null));
+    }
+
+    public static List<PublicProfile> listFollowedProfiles(AccountSession session)
+            throws IOException, JSONException {
+        JSONObject body = new JSONObject();
+        body.put("result_limit", 50);
+        return parseProfiles(requestWithSession(
+                "/rest/v1/rpc/list_followed_profiles", "POST", body, session, null));
+    }
+
+    public static List<PublicServer> searchPublicServers(
+            AccountSession session, String query) throws IOException, JSONException {
+        String term = validateSearchTerm(query);
+        JSONObject body = new JSONObject();
+        body.put("search_term", term);
+        body.put("result_limit", 30);
+        return parsePublicServers(requestWithSession(
+                "/rest/v1/rpc/search_public_servers", "POST", body, session, null), null);
+    }
+
+    public static List<PublicServer> listPublicServers(
+            AccountSession session, String ownerId) throws IOException, JSONException {
+        String target = validateUserId(ownerId);
+        JSONObject body = new JSONObject();
+        body.put("target_user", target);
+        body.put("result_limit", 50);
+        return parsePublicServers(requestWithSession(
+                "/rest/v1/rpc/list_public_servers", "POST", body, session, null), target);
+    }
+
+    public static void followProfile(AccountSession session, String targetId)
+            throws IOException, JSONException {
+        String target = validateUserId(targetId);
+        if (target.equals(session.userId)) {
+            throw new IllegalArgumentException("Нельзя подписаться на собственный профиль.");
+        }
+        JSONObject body = new JSONObject();
+        body.put("follower_id", session.userId);
+        body.put("followed_id", target);
+        requestWithSession(
+                "/rest/v1/profile_follows?on_conflict=follower_id,followed_id",
+                "POST",
+                body,
+                session,
+                "resolution=ignore-duplicates,return=minimal");
+    }
+
+    public static void unfollowProfile(AccountSession session, String targetId)
+            throws IOException, JSONException {
+        String target = validateUserId(targetId);
+        if (target.equals(session.userId)) {
+            throw new IllegalArgumentException("Нельзя отписаться от собственного профиля.");
+        }
+        requestWithSession(
+                "/rest/v1/profile_follows?follower_id=eq." + encode(session.userId)
+                        + "&followed_id=eq." + encode(target),
+                "DELETE",
+                null,
+                session,
+                null);
+    }
+
+    public static PublicProfile uploadAvatar(AccountSession session, byte[] jpeg)
+            throws IOException, JSONException {
+        if (jpeg == null || jpeg.length < 3
+                || (jpeg[0] & 0xff) != 0xff
+                || (jpeg[1] & 0xff) != 0xd8
+                || (jpeg[2] & 0xff) != 0xff) {
+            throw new IllegalArgumentException("Аватар должен быть изображением JPEG.");
+        }
+        if (jpeg.length > 2 * 1024 * 1024) {
+            throw new IllegalArgumentException("Размер аватара не должен превышать 2 МБ.");
+        }
+        String userId = validateUserId(session.userId);
+        requestBytesWithSession(
+                "/storage/v1/object/avatars/" + userId + "/avatar.jpg",
+                "POST",
+                jpeg,
+                session,
+                "image/jpeg",
+                "x-upsert",
+                "true");
+        JSONObject update = new JSONObject();
+        update.put("avatar_path", userId + "/avatar.jpg");
+        requestWithSession(
+                "/rest/v1/profiles?id=eq." + encode(userId),
+                "PATCH",
+                update,
+                session,
+                "return=minimal");
+        return fetchProfile(session);
+    }
+
+    public static String avatarUrl(PublicProfile profile) {
+        if (profile == null || profile.avatarPath == null
+                || !profile.avatarPath.equals(profile.userId + "/avatar.jpg")) {
+            return null;
+        }
+        return PROJECT_URL + "/storage/v1/object/public/avatars/"
+                + profile.userId + "/avatar.jpg";
+    }
+
+    public static byte[] downloadAvatar(PublicProfile profile) throws IOException {
+        String avatarUrl = avatarUrl(profile);
+        if (avatarUrl == null) {
+            return null;
+        }
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(avatarUrl).openConnection();
+            connection.setConnectTimeout(TIMEOUT_MS);
+            connection.setReadTimeout(TIMEOUT_MS);
+            connection.setRequestProperty("Accept", "image/jpeg");
+            int status = connection.getResponseCode();
+            if (status < 200 || status >= 300) {
+                throw new IOException("Не удалось загрузить аватар (HTTP " + status + ").");
+            }
+            try (InputStream input = connection.getInputStream();
+                    ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[4096];
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    if (output.size() + read > 2 * 1024 * 1024) {
+                        throw new IOException("Размер аватара превышает 2 МБ.");
+                    }
+                    output.write(buffer, 0, read);
+                }
+                byte[] data = output.toByteArray();
+                if (data.length < 3 || (data[0] & 0xff) != 0xff
+                        || (data[1] & 0xff) != 0xd8 || (data[2] & 0xff) != 0xff) {
+                    throw new IOException("Supabase вернул некорректный файл аватара.");
+                }
+                return data;
+            }
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private static String validateSearchTerm(String query) {
+        String term = query == null ? "" : query.trim();
+        if (term.length() < 2 || term.length() > 80) {
+            throw new IllegalArgumentException("Для поиска введи от 2 до 80 символов.");
+        }
+        return term;
+    }
+
+    private static String validateUserId(String userId) {
+        try {
+            String normalized = UUID.fromString(userId).toString();
+            if (!normalized.equalsIgnoreCase(userId)) {
+                throw new IllegalArgumentException("non-canonical UUID");
+            }
+            return normalized;
+        } catch (IllegalArgumentException | NullPointerException exception) {
+            throw new IllegalArgumentException("У профиля неверный идентификатор.", exception);
+        }
+    }
+
+    private static List<PublicProfile> parseProfiles(String raw)
+            throws IOException, JSONException {
+        JSONArray rows = new JSONArray(raw);
+        List<PublicProfile> result = new ArrayList<>();
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject row = rows.optJSONObject(i);
+            if (row == null) {
+                throw new IOException("Supabase вернул профиль в неверном формате.");
+            }
+            result.add(profileFrom(row));
+        }
+        return result;
+    }
+
+    private static PublicProfile profileFrom(JSONObject row) throws IOException {
+        String userId;
+        try {
+            userId = validateUserId(row.optString("id", ""));
+        } catch (IllegalArgumentException exception) {
+            throw new IOException("Supabase вернул профиль с неверным идентификатором.", exception);
+        }
+        String username = row.optString("username", "");
+        if (!username.matches("[A-Za-z0-9_]{3,16}")) {
+            throw new IOException("Supabase вернул профиль с неверным никнеймом.");
+        }
+        String avatarPath = row.isNull("avatar_path")
+                ? null : row.optString("avatar_path", null);
+        if (avatarPath != null && !avatarPath.equals(userId + "/avatar.jpg")) {
+            throw new IOException("Supabase вернул небезопасный путь аватара.");
+        }
+        return new PublicProfile(
+                userId,
+                username,
+                row.optString("display_name", ""),
+                row.optString("bio", ""),
+                avatarPath,
+                row.optBoolean("share_servers", false),
+                row.optBoolean("is_following", false));
+    }
+
+    private static List<PublicServer> parsePublicServers(String raw, String ownerFallback)
+            throws IOException, JSONException {
+        JSONArray rows = new JSONArray(raw);
+        List<PublicServer> result = new ArrayList<>();
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject row = rows.optJSONObject(i);
+            if (row == null) {
+                throw new IOException("Supabase вернул сервер в неверном формате.");
+            }
+            String ownerId = row.optString("owner_id", ownerFallback == null ? "" : ownerFallback);
+            if (!ownerId.isEmpty()) {
+                try {
+                    ownerId = validateUserId(ownerId);
+                } catch (IllegalArgumentException exception) {
+                    throw new IOException("Supabase вернул сервер с неверным владельцем.", exception);
+                }
+            }
+            String username = row.optString("username", "");
+            String address = row.optString("server_address", "");
+            if (!username.matches("[A-Za-z0-9_]{3,16}") || address.trim().isEmpty()) {
+                throw new IOException("Supabase вернул сервер с неверными данными.");
+            }
+            String protocol = ServerEntry.normalizeProtocol(row.optString("protocol", "java"));
+            result.add(new PublicServer(
+                    ownerId,
+                    username,
+                    row.optString("display_name", ""),
+                    row.optString("server_name", address),
+                    address,
+                    protocol));
+        }
+        return result;
+    }
+
+    private static String encode(String value) {
+        try {
+            return URLEncoder.encode(value, StandardCharsets.UTF_8.name());
+        } catch (IOException exception) {
+            throw new IllegalStateException(exception);
+        }
+    }
+
+    private static void requestBytesWithSession(
+            String path,
+            String method,
+            byte[] body,
+            AccountSession session,
+            String contentType,
+            String headerName,
+            String headerValue) throws IOException, JSONException {
+        try {
+            requestBytes(path, method, body, session, contentType, headerName, headerValue);
+        } catch (CloudException exception) {
+            if (exception.statusCode != HttpURLConnection.HTTP_UNAUTHORIZED) {
+                throw exception;
+            }
+            refreshSession(session);
+            requestBytes(path, method, body, session, contentType, headerName, headerValue);
+        }
+    }
+
+    private static void requestBytes(
+            String path,
+            String method,
+            byte[] body,
+            AccountSession session,
+            String contentType,
+            String headerName,
+            String headerValue) throws IOException {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL(PROJECT_URL + path).openConnection();
+            connection.setRequestMethod(method);
+            connection.setConnectTimeout(TIMEOUT_MS);
+            connection.setReadTimeout(TIMEOUT_MS);
+            connection.setRequestProperty("apikey", PUBLISHABLE_KEY);
+            connection.setRequestProperty("Authorization", "Bearer " + session.accessToken);
+            connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("Content-Type", contentType);
+            connection.setRequestProperty(headerName, headerValue);
+            connection.setDoOutput(true);
+            try (OutputStream output = connection.getOutputStream()) {
+                output.write(body);
+            }
+            int status = connection.getResponseCode();
+            InputStream stream = status >= 200 && status < 300
+                    ? connection.getInputStream()
+                    : connection.getErrorStream();
+            String response = stream == null ? "" : readUtf8(stream);
+            if (status < 200 || status >= 300) {
+                throw new CloudException(status, errorMessage(response));
+            }
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 
     public static String syntheticEmail(String username) {
@@ -389,6 +746,57 @@ public final class CloudSyncClient {
             return message.isEmpty() ? response : message;
         } catch (JSONException ignored) {
             return response.isEmpty() ? "Ошибка соединения с Supabase" : response;
+        }
+    }
+
+    public static final class PublicProfile {
+        public final String userId;
+        public final String username;
+        public final String displayName;
+        public final String bio;
+        public final String avatarPath;
+        public final boolean shareServers;
+        public final boolean isFollowing;
+
+        private PublicProfile(
+                String userId,
+                String username,
+                String displayName,
+                String bio,
+                String avatarPath,
+                boolean shareServers,
+                boolean isFollowing) {
+            this.userId = userId;
+            this.username = username;
+            this.displayName = displayName;
+            this.bio = bio;
+            this.avatarPath = avatarPath;
+            this.shareServers = shareServers;
+            this.isFollowing = isFollowing;
+        }
+    }
+
+    public static final class PublicServer {
+        public final String ownerId;
+        public final String username;
+        public final String displayName;
+        public final String name;
+        public final String address;
+        public final String protocol;
+
+        private PublicServer(
+                String ownerId,
+                String username,
+                String displayName,
+                String name,
+                String address,
+                String protocol) {
+            this.ownerId = ownerId;
+            this.username = username;
+            this.displayName = displayName;
+            this.name = name;
+            this.address = address;
+            this.protocol = protocol;
         }
     }
 

@@ -33,6 +33,7 @@ import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -42,6 +43,8 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -86,6 +89,18 @@ public class MainActivity extends Activity {
     private final Object syncLock = new Object();
     private boolean syncRunning;
     private boolean syncPending;
+    private AlertDialog profileDialog;
+    private EditText profileDisplayName;
+    private EditText profileBio;
+    private CheckBox profileShareServers;
+    private ImageView profileAvatarView;
+    private TextView profileStatus;
+    private byte[] pendingAvatarJpeg;
+    private AlertDialog communityDialog;
+    private EditText communitySearch;
+    private LinearLayout communityResults;
+    private int communityMode;
+    private int communityRequestId;
     private final LruCache<String, Bitmap> iconCache = new LruCache<String, Bitmap>(6 * 1024 * 1024) {
         @Override
         protected int sizeOf(String key, Bitmap value) {
@@ -293,6 +308,7 @@ public class MainActivity extends Activity {
                     return true;
                 }
             }
+
         }
         return false;
     }
@@ -575,6 +591,8 @@ public class MainActivity extends Activity {
 
         String[] options = {
                 "Профиль",
+                "Поиск игроков и серверов",
+                "Мои подписки",
                 "Синхронизировать сейчас",
                 "Настройки",
                 "Выйти из аккаунта"
@@ -585,8 +603,12 @@ public class MainActivity extends Activity {
                     if (which == 0) {
                         showProfileDialog(session);
                     } else if (which == 1) {
-                        requestCloudSync(false);
+                        showCommunityDialog(session, false);
                     } else if (which == 2) {
+                        showCommunityDialog(session, true);
+                    } else if (which == 3) {
+                        requestCloudSync(false);
+                    } else if (which == 4) {
                         showSettingsDialog();
                     } else {
                         new AlertDialog.Builder(this, R.style.DialogTheme)
@@ -607,13 +629,557 @@ public class MainActivity extends Activity {
     }
 
     private void showProfileDialog(AccountSession session) {
-        int serverCount = ServerStore.load(this).size();
-        new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle(session.username)
-                .setMessage("Серверов в вашем списке: " + serverCount
-                        + "\nПубличные профили и подписки пока не подключены.")
-                .setPositiveButton("Закрыть", null)
-                .show();
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(20);
+        form.setPadding(padding, dp(8), padding, 0);
+
+        TextView username = new TextView(this);
+        username.setText("@" + session.username + "  ·  "
+                + ServerStore.load(this).size() + " серверов в вашем списке");
+        username.setTextColor(getColor(R.color.dim));
+        form.addView(username);
+
+        profileAvatarView = new ImageView(this);
+        profileAvatarView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        profileAvatarView.setBackground(avatarBackground());
+        profileAvatarView.setClipToOutline(true);
+        form.addView(profileAvatarView, new LinearLayout.LayoutParams(dp(72), dp(72)));
+
+        profileDisplayName = new EditText(this);
+        profileDisplayName.setSingleLine(true);
+        profileDisplayName.setHint("Отображаемое имя");
+        profileDisplayName.setMaxLines(1);
+        form.addView(profileDisplayName);
+
+        profileBio = new EditText(this);
+        profileBio.setHint("О себе (до 160 символов)");
+        profileBio.setMinLines(2);
+        profileBio.setMaxLines(4);
+        form.addView(profileBio);
+
+        profileShareServers = new CheckBox(this);
+        profileShareServers.setText("Публично показывать адреса моих серверов");
+        profileShareServers.setTextColor(getColor(R.color.soft));
+        form.addView(profileShareServers);
+        TextView privacyNote = new TextView(this);
+        privacyNote.setText("Выключено по умолчанию. При включении адреса будут видны "
+                + "авторизованным пользователям в поиске.");
+        privacyNote.setTextColor(getColor(R.color.dim));
+        privacyNote.setTextSize(12f);
+        form.addView(privacyNote);
+
+        Button avatarButton = new Button(this);
+        avatarButton.setText("Выбрать аватар");
+        avatarButton.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.setType("image/*");
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            startActivityForResult(intent, REQUEST_AVATAR);
+        });
+        form.addView(avatarButton);
+
+        profileStatus = new TextView(this);
+        profileStatus.setText("Загружаю профиль…");
+        profileStatus.setTextColor(getColor(R.color.dim));
+        form.addView(profileStatus);
+        pendingAvatarJpeg = null;
+
+        profileDialog = new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle("Мой профиль")
+                .setView(form)
+                .setNegativeButton("Закрыть", null)
+                .setPositiveButton("Сохранить", null)
+                .create();
+        profileDialog.setOnShowListener(ignored -> {
+            profileDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(getColor(R.color.mint));
+            profileDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(getColor(R.color.soft));
+            profileDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v ->
+                    saveProfile(session));
+        });
+        profileDialog.setOnDismissListener(ignored -> {
+            profileDialog = null;
+            profileDisplayName = null;
+            profileBio = null;
+            profileShareServers = null;
+            profileAvatarView = null;
+            profileStatus = null;
+            pendingAvatarJpeg = null;
+        });
+        profileDialog.show();
+
+        syncExecutor.execute(() -> {
+            try {
+                CloudSyncClient.PublicProfile profile = CloudSyncClient.fetchProfile(session);
+                byte[] avatar = null;
+                String avatarWarning = null;
+                try {
+                    avatar = CloudSyncClient.downloadAvatar(profile);
+                } catch (IOException exception) {
+                    avatarWarning = "Не удалось загрузить аватар: " + exception.getMessage();
+                    Log.w(TAG, "Не удалось загрузить аватар профиля", exception);
+                }
+                byte[] avatarBytes = avatar;
+                String warning = avatarWarning;
+                AccountSessionStore.save(getApplicationContext(), session);
+                handler.post(() -> {
+                    if (profileDialog == null || profileDisplayName == null) {
+                        return;
+                    }
+                    profileDisplayName.setText(profile.displayName);
+                    profileBio.setText(profile.bio);
+                    profileShareServers.setChecked(profile.shareServers);
+                    if (profileAvatarView != null && avatarBytes != null) {
+                        Bitmap bitmap = BitmapFactory.decodeByteArray(
+                                avatarBytes, 0, avatarBytes.length);
+                        if (bitmap != null) {
+                            profileAvatarView.setImageBitmap(bitmap);
+                        }
+                    }
+                    profileStatus.setText(warning != null
+                            ? warning
+                            : profile.avatarPath == null
+                            ? "Аватар не установлен."
+                            : "Текущий аватар установлен.");
+                });
+            } catch (Exception exception) {
+                handler.post(() -> {
+                    if (profileStatus != null) {
+                        profileStatus.setText(cloudErrorMessage(exception));
+                    }
+                });
+            }
+        });
+    }
+
+    private void saveProfile(AccountSession session) {
+        if (profileDisplayName == null || profileBio == null || profileShareServers == null) {
+            return;
+        }
+        String displayName = profileDisplayName.getText().toString();
+        String bio = profileBio.getText().toString();
+        boolean share = profileShareServers.isChecked();
+        byte[] avatar = pendingAvatarJpeg;
+        if (profileStatus != null) {
+            profileStatus.setText("Сохраняю профиль…");
+        }
+        profileDialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+        syncExecutor.execute(() -> {
+            try {
+                CloudSyncClient.updateProfile(session, displayName, bio, share);
+                if (avatar != null) {
+                    CloudSyncClient.uploadAvatar(session, avatar);
+                }
+                AccountSessionStore.save(getApplicationContext(), session);
+                handler.post(() -> {
+                    if (profileDialog != null) {
+                        profileDialog.dismiss();
+                    }
+                    Toast.makeText(this, "Профиль сохранён.", Toast.LENGTH_SHORT).show();
+                });
+            } catch (Exception exception) {
+                handler.post(() -> {
+                    if (profileDialog != null && profileStatus != null) {
+                        profileStatus.setText(cloudErrorMessage(exception));
+                        profileDialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                    }
+                });
+            }
+        });
+    }
+
+    private static final int REQUEST_AVATAR = 7103;
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_AVATAR || resultCode != RESULT_OK
+                || data == null || data.getData() == null) {
+            return;
+        }
+        Uri uri = data.getData();
+        try {
+            Bitmap selected = decodeAvatar(uri);
+            int side = Math.min(selected.getWidth(), selected.getHeight());
+            Bitmap square = Bitmap.createBitmap(
+                    selected,
+                    (selected.getWidth() - side) / 2,
+                    (selected.getHeight() - side) / 2,
+                    side,
+                    side);
+            Bitmap resized = Bitmap.createScaledBitmap(square, 512, 512, true);
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            if (!resized.compress(Bitmap.CompressFormat.JPEG, 86, output)
+                    || output.size() > 2 * 1024 * 1024) {
+                throw new IOException("Изображение слишком большое для аватара.");
+            }
+            pendingAvatarJpeg = output.toByteArray();
+            if (profileAvatarView != null) {
+                Bitmap preview = BitmapFactory.decodeByteArray(
+                        pendingAvatarJpeg, 0, pendingAvatarJpeg.length);
+                if (preview != null) {
+                    profileAvatarView.setImageBitmap(preview);
+                }
+            }
+            if (profileStatus != null) {
+                profileStatus.setText("Аватар готов к загрузке.");
+            }
+            if (square != selected) {
+                square.recycle();
+            }
+            if (resized != selected && resized != square) {
+                resized.recycle();
+            }
+            selected.recycle();
+        } catch (Exception exception) {
+            if (profileStatus != null) {
+                profileStatus.setText("Не удалось открыть изображение: " + exception.getMessage());
+            }
+        }
+    }
+
+    private Bitmap decodeAvatar(Uri uri) throws IOException {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
+            if (input == null) {
+                throw new IOException("Не удалось открыть выбранное изображение.");
+            }
+            BitmapFactory.decodeStream(input, null, bounds);
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            throw new IOException("Выбранный файл не является изображением.");
+        }
+        int sample = 1;
+        while (Math.max(bounds.outWidth / sample, bounds.outHeight / sample) > 1024) {
+            sample *= 2;
+        }
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sample;
+        try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
+            Bitmap selected = input == null ? null : BitmapFactory.decodeStream(input, null, options);
+            if (selected == null) {
+                throw new IOException("Не удалось прочитать изображение.");
+            }
+            return selected;
+        }
+    }
+
+    private void showCommunityDialog(AccountSession session, boolean followedOnly) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(18);
+        root.setPadding(padding, dp(6), padding, 0);
+
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        String[] tabNames = {"Игроки", "Серверы", "Подписки"};
+        Button[] tabButtons = new Button[tabNames.length];
+        for (int i = 0; i < tabNames.length; i++) {
+            final int mode = i;
+            Button tab = new Button(this);
+            tab.setText(tabNames[i]);
+            tab.setOnClickListener(v -> setCommunityMode(mode, session));
+            tabs.addView(tab, new LinearLayout.LayoutParams(0, dp(44), 1f));
+            tabButtons[i] = tab;
+        }
+        root.addView(tabs);
+
+        communitySearch = new EditText(this);
+        communitySearch.setSingleLine(true);
+        communitySearch.setHint("Ник, имя или сервер (от 2 символов)");
+        root.addView(communitySearch);
+
+        ScrollView resultsScroll = new ScrollView(this);
+        communityResults = new LinearLayout(this);
+        communityResults.setOrientation(LinearLayout.VERTICAL);
+        communityResults.setPadding(0, dp(8), 0, dp(8));
+        resultsScroll.addView(communityResults);
+        root.addView(resultsScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(360)));
+
+        communityDialog = new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle("Сообщество")
+                .setView(root)
+                .setNegativeButton("Закрыть", null)
+                .create();
+        communityDialog.setOnDismissListener(ignored -> {
+            communityDialog = null;
+            communitySearch = null;
+            communityResults = null;
+            communityRequestId++;
+        });
+        communityDialog.show();
+        communityMode = followedOnly ? 2 : 0;
+        communitySearch.setVisibility(followedOnly ? View.GONE : View.VISIBLE);
+        communitySearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence value, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence value, int start, int before, int count) {
+                handler.removeCallbacksAndMessages("community-search");
+                handler.postAtTime(
+                        () -> loadCommunity(session),
+                        "community-search",
+                        android.os.SystemClock.uptimeMillis() + 320);
+            }
+
+            @Override
+            public void afterTextChanged(Editable value) {
+            }
+        });
+        for (int i = 0; i < tabButtons.length; i++) {
+            tabButtons[i].setEnabled(i != 2 || !followedOnly);
+        }
+        loadCommunity(session);
+    }
+
+    private void setCommunityMode(int mode, AccountSession session) {
+        communityMode = mode;
+        if (communitySearch != null) {
+            communitySearch.setVisibility(mode == 2 ? View.GONE : View.VISIBLE);
+            if (mode != 2) {
+                communitySearch.setText("");
+            }
+        }
+        loadCommunity(session);
+    }
+
+    private void loadCommunity(AccountSession session) {
+        if (communityDialog == null || communityResults == null) {
+            return;
+        }
+        final int requestId = ++communityRequestId;
+        final int mode = communityMode;
+        final String query = communitySearch == null
+                ? "" : communitySearch.getText().toString().trim();
+        communityResults.removeAllViews();
+        if (mode != 2 && query.length() < 2) {
+            addCommunityMessage("Введи не менее двух символов для поиска.");
+            return;
+        }
+        addCommunityMessage("Ищу…");
+        syncExecutor.execute(() -> {
+            List<CloudSyncClient.PublicProfile> profiles = null;
+            List<CloudSyncClient.PublicServer> servers = null;
+            Exception failure = null;
+            try {
+                if (mode == 0) {
+                    profiles = CloudSyncClient.searchProfiles(session, query);
+                } else if (mode == 1) {
+                    servers = CloudSyncClient.searchPublicServers(session, query);
+                } else {
+                    profiles = CloudSyncClient.listFollowedProfiles(session);
+                }
+                AccountSessionStore.save(getApplicationContext(), session);
+            } catch (Exception exception) {
+                failure = exception;
+            }
+            List<CloudSyncClient.PublicProfile> finalProfiles = profiles;
+            List<CloudSyncClient.PublicServer> finalServers = servers;
+            Exception finalFailure = failure;
+            handler.post(() -> {
+                if (communityDialog == null || requestId != communityRequestId) {
+                    return;
+                }
+                communityResults.removeAllViews();
+                if (finalFailure != null) {
+                    addCommunityMessage(cloudErrorMessage(finalFailure));
+                } else if (mode == 1) {
+                    renderCommunityServers(finalServers);
+                } else {
+                    renderCommunityProfiles(
+                            finalProfiles,
+                            mode == 2,
+                            session);
+                }
+            });
+        });
+    }
+
+    private void renderCommunityProfiles(
+            List<CloudSyncClient.PublicProfile> profiles,
+            boolean followed,
+            AccountSession session) {
+        if (profiles.isEmpty()) {
+            addCommunityMessage(followed ? "Ты пока ни на кого не подписан."
+                    : "Ничего не найдено.");
+            return;
+        }
+        for (CloudSyncClient.PublicProfile profile : profiles) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, dp(8), 0, dp(8));
+            LinearLayout identity = new LinearLayout(this);
+            identity.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            ImageView avatar = new ImageView(this);
+            avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            avatar.setBackground(avatarBackground());
+            avatar.setClipToOutline(true);
+            avatar.setTag(profile.userId);
+            identity.addView(avatar, new LinearLayout.LayoutParams(dp(40), dp(40)));
+            TextView title = new TextView(this);
+            title.setText((profile.displayName.isEmpty()
+                    ? profile.username : profile.displayName + "  @" + profile.username));
+            title.setTextColor(getColor(R.color.soft));
+            title.setTextSize(15);
+            LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            titleParams.leftMargin = dp(10);
+            identity.addView(title, titleParams);
+            row.addView(identity);
+            loadCommunityAvatar(avatar, profile);
+            if (!profile.bio.isEmpty()) {
+                TextView bio = new TextView(this);
+                bio.setText(profile.bio);
+                bio.setTextColor(getColor(R.color.dim));
+                row.addView(bio);
+            }
+            LinearLayout actions = new LinearLayout(this);
+            actions.setOrientation(LinearLayout.HORIZONTAL);
+            Button follow = new Button(this);
+            follow.setText(profile.isFollowing ? "Отписаться" : "Подписаться");
+            follow.setOnClickListener(v -> changeFollow(session, profile));
+            actions.addView(follow);
+            Button servers = new Button(this);
+            servers.setText("Серверы");
+            servers.setOnClickListener(v -> loadProfileServers(session, profile));
+            actions.addView(servers);
+            row.addView(actions);
+            communityResults.addView(row);
+            View divider = new View(this);
+            divider.setBackgroundColor(Color.argb(45, 255, 255, 255));
+            communityResults.addView(divider, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(1)));
+        }
+    }
+
+    private GradientDrawable avatarBackground() {
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.OVAL);
+        background.setColor(Color.argb(50, 126, 224, 163));
+        background.setStroke(dp(1), Color.argb(100, 126, 224, 163));
+        return background;
+    }
+
+    private void loadCommunityAvatar(
+            ImageView imageView, CloudSyncClient.PublicProfile profile) {
+        if (profile.avatarPath == null) {
+            return;
+        }
+        executor.execute(() -> {
+            try {
+                byte[] data = CloudSyncClient.downloadAvatar(profile);
+                if (data == null) {
+                    return;
+                }
+                Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+                if (bitmap == null) {
+                    throw new IOException("Изображение аватара повреждено.");
+                }
+                handler.post(() -> {
+                    if (!isFinishing() && profile.userId.equals(imageView.getTag())) {
+                        imageView.setImageBitmap(bitmap);
+                    }
+                });
+            } catch (IOException exception) {
+                Log.w(TAG, "Не удалось загрузить публичный аватар", exception);
+            }
+        });
+    }
+
+    private void renderCommunityServers(List<CloudSyncClient.PublicServer> servers) {
+        if (servers.isEmpty()) {
+            addCommunityMessage("Публичных серверов не найдено.");
+            return;
+        }
+        for (CloudSyncClient.PublicServer server : servers) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setPadding(0, dp(8), 0, dp(8));
+            TextView details = new TextView(this);
+            details.setText(server.name + "\n" + server.address + " · "
+                    + server.protocol.toUpperCase(Locale.ROOT) + " · @" + server.username);
+            details.setTextColor(getColor(R.color.soft));
+            row.addView(details, new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            Button add = new Button(this);
+            add.setText("Добавить");
+            add.setOnClickListener(v -> addPublicServer(server));
+            row.addView(add);
+            communityResults.addView(row);
+        }
+    }
+
+    private void addCommunityMessage(String message) {
+        if (communityResults == null) {
+            return;
+        }
+        TextView status = new TextView(this);
+        status.setText(message);
+        status.setTextColor(getColor(R.color.dim));
+        status.setPadding(0, dp(12), 0, dp(12));
+        communityResults.addView(status);
+    }
+
+    private void changeFollow(
+            AccountSession session, CloudSyncClient.PublicProfile profile) {
+        syncExecutor.execute(() -> {
+            try {
+                if (profile.isFollowing) {
+                    CloudSyncClient.unfollowProfile(session, profile.userId);
+                } else {
+                    CloudSyncClient.followProfile(session, profile.userId);
+                }
+                AccountSessionStore.save(getApplicationContext(), session);
+                handler.post(() -> loadCommunity(session));
+            } catch (Exception exception) {
+                handler.post(() -> Toast.makeText(
+                        this, cloudErrorMessage(exception), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void loadProfileServers(
+            AccountSession session, CloudSyncClient.PublicProfile profile) {
+        final int requestId = ++communityRequestId;
+        syncExecutor.execute(() -> {
+            try {
+                List<CloudSyncClient.PublicServer> servers =
+                        CloudSyncClient.listPublicServers(session, profile.userId);
+                AccountSessionStore.save(getApplicationContext(), session);
+                handler.post(() -> {
+                    if (communityResults == null || requestId != communityRequestId) {
+                        return;
+                    }
+                    communityResults.removeAllViews();
+                    renderCommunityServers(servers);
+                });
+            } catch (Exception exception) {
+                handler.post(() -> Toast.makeText(
+                        this, cloudErrorMessage(exception), Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+
+    private void addPublicServer(CloudSyncClient.PublicServer server) {
+        List<ServerEntry> servers = ServerStore.load(this);
+        for (ServerEntry existing : servers) {
+            if (ServerEntry.normalize(existing.address)
+                    .equalsIgnoreCase(ServerEntry.normalize(server.address))) {
+                Toast.makeText(this, "Этот сервер уже есть в списке.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+        ServerEntry entry = new ServerEntry(server.address, server.name);
+        entry.protocol = ServerEntry.normalizeProtocol(server.protocol);
+        servers.add(entry);
+        ServerStore.save(this, servers);
+        buildCards();
+        requestCloudSync(true);
+        Toast.makeText(this, "Сервер добавлен.", Toast.LENGTH_SHORT).show();
     }
 
     private void showSettingsDialog() {
