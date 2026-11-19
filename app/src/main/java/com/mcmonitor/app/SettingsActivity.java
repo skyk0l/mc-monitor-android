@@ -3,7 +3,13 @@ package com.mcmonitor.app;
 import android.app.Activity;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.Insets;
 import android.os.Bundle;
+import android.os.Build;
+import android.view.View;
+import android.view.WindowInsets;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -22,22 +28,41 @@ public class SettingsActivity extends Activity {
     };
 
     private LinearLayout content;
+    private View root;
+    private BackdropView backdrop;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(Color.rgb(15, 18, 25));
+        int appAccent = getSharedPreferences("app_settings", MODE_PRIVATE)
+                .getInt("accent_color", APP_ACCENTS[0]);
+        getWindow().setStatusBarColor(
+                Build.VERSION.SDK_INT >= 35
+                        ? Color.TRANSPARENT : BackdropView.topBarColor(appAccent));
         getWindow().setNavigationBarColor(Color.rgb(15, 18, 25));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            getWindow().getAttributes().layoutInDisplayCutoutMode =
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
 
+        FrameLayout frame = new FrameLayout(this);
+        root = frame;
+        backdrop = new BackdropView(this);
+        backdrop.setAccentColor(appAccent);
+        frame.addView(backdrop, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Color.TRANSPARENT);
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         int padding = dp(22);
         content.setPadding(padding, dp(18), padding, dp(24));
-        content.setBackgroundColor(Color.rgb(15, 18, 25));
+        content.setBackgroundColor(Color.TRANSPARENT);
         scroll.addView(content);
-        setContentView(scroll);
+        frame.addView(scroll, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        setContentView(frame);
 
         TextView back = text("‹   Назад", 15, 0xFFA7C6A4);
         back.setTypeface(Typeface.DEFAULT_BOLD);
@@ -56,8 +81,14 @@ public class SettingsActivity extends Activity {
         addColorChoices(APP_ACCENT_NAMES, APP_ACCENTS,
                 getSharedPreferences("app_settings", MODE_PRIVATE)
                         .getInt("accent_color", APP_ACCENTS[0]),
-                color -> getSharedPreferences("app_settings", MODE_PRIVATE).edit()
-                        .putInt("accent_color", color).apply());
+                color -> {
+                    getSharedPreferences("app_settings", MODE_PRIVATE).edit()
+                            .putInt("accent_color", color).apply();
+                    backdrop.setAccentColor(color);
+                    getWindow().setStatusBarColor(
+                            Build.VERSION.SDK_INT >= 35
+                                    ? Color.TRANSPARENT : BackdropView.topBarColor(color));
+                });
 
         addSection("ВИДЖЕТЫ");
         addHint("Цвета и видимая информация сохраняются на устройстве и сразу применяются.");
@@ -81,6 +112,32 @@ public class SettingsActivity extends Activity {
         TextView account = text("Аккаунт и синхронизация находятся в меню профиля.", 12, 0xFF929A97);
         account.setPadding(0, dp(18), 0, 0);
         content.addView(account);
+        applyWindowInsets();
+    }
+
+    private void applyWindowInsets() {
+        final int baseTop = content.getPaddingTop();
+        final int baseBottom = content.getPaddingBottom();
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
+            int top;
+            int bottom;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Insets bars = insets.getInsets(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                top = bars.top;
+                bottom = bars.bottom;
+            } else {
+                top = insets.getSystemWindowInsetTop();
+                bottom = insets.getSystemWindowInsetBottom();
+            }
+            content.setPadding(
+                    content.getPaddingLeft(),
+                    baseTop + top,
+                    content.getPaddingRight(),
+                    baseBottom + bottom);
+            return insets;
+        });
+        root.requestApplyInsets();
     }
 
     private void addColorChoices(
@@ -90,13 +147,20 @@ public class SettingsActivity extends Activity {
         for (int i = 0; i < names.length; i++) {
             final int color = colors[i];
             RadioButton button = new RadioButton(this);
+            button.setId(View.generateViewId());
             button.setText(names[i]);
             button.setTextColor(0xFFE6E9E5);
             button.setButtonTintList(android.content.res.ColorStateList.valueOf(color));
             button.setChecked(color == selected);
-            button.setOnClickListener(v -> listener.select(color));
+            button.setTag(color);
             group.addView(button);
         }
+        group.setOnCheckedChangeListener((checkedGroup, checkedId) -> {
+            View checked = checkedGroup.findViewById(checkedId);
+            if (checked != null && checked.getTag() instanceof Integer) {
+                listener.select((Integer) checked.getTag());
+            }
+        });
         content.addView(group);
     }
 
@@ -108,17 +172,22 @@ public class SettingsActivity extends Activity {
         for (int i = 0; i < WidgetSettingsStore.BACKGROUNDS.length; i++) {
             final int index = i;
             RadioButton button = new RadioButton(this);
+            button.setId(View.generateViewId());
             button.setText(WidgetSettingsStore.BACKGROUND_NAMES[i]);
             button.setTextColor(0xFFE6E9E5);
             button.setButtonTintList(android.content.res.ColorStateList.valueOf(
                     WidgetSettingsStore.BACKGROUNDS[i]));
             button.setChecked(i == selected);
-            button.setOnClickListener(v -> {
-                WidgetSettingsStore.setBackground(this, index);
-                WidgetUpdater.renderAll(this);
-            });
+            button.setTag(index);
             group.addView(button);
         }
+        group.setOnCheckedChangeListener((checkedGroup, checkedId) -> {
+            View checked = checkedGroup.findViewById(checkedId);
+            if (checked != null && checked.getTag() instanceof Integer) {
+                WidgetSettingsStore.setBackground(this, (Integer) checked.getTag());
+                WidgetUpdater.renderAll(this);
+            }
+        });
         content.addView(group);
     }
 

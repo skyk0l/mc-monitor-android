@@ -39,6 +39,15 @@ public class BackdropView extends View {
         invalidate();
     }
 
+    public static int topBarColor(int accentColor) {
+        int base = 0xFF0F1219;
+        int amount = 8;
+        return Color.rgb(
+                (Color.red(base) * (100 - amount) + Color.red(accentColor) * amount) / 100,
+                (Color.green(base) * (100 - amount) + Color.green(accentColor) * amount) / 100,
+                (Color.blue(base) * (100 - amount) + Color.blue(accentColor) * amount) / 100);
+    }
+
     @Override
     protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
         super.onSizeChanged(width, height, oldWidth, oldHeight);

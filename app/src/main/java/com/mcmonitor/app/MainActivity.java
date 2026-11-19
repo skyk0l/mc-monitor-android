@@ -182,14 +182,9 @@ public class MainActivity extends Activity {
         updateAccountButton();
     }
 
-    /**
-     * На Android 15 приложение рисуется под шторкой — добавляем отступ и мягкую
-     * серую полоску сверху, чтобы часы и заряд не наезжали на контент.
-     * На старых версиях система сама отдаёт место, поэтому полоска выходит нулевой.
-     */
+    /** Keeps content below system bars while the themed backdrop continues behind them. */
     private void applyWindowInsets() {
         final View root = findViewById(R.id.root);
-        final View scrim = findViewById(R.id.statusScrim);
         final View content = findViewById(R.id.content);
         final int baseTop = content.getPaddingTop();
         final int baseBottom = content.getPaddingBottom();
@@ -212,11 +207,6 @@ public class MainActivity extends Activity {
                 bottom = insets.getSystemWindowInsetBottom();
             }
 
-            ViewGroup.LayoutParams params = scrim.getLayoutParams();
-            if (params.height != top) {
-                params.height = top;
-                scrim.setLayoutParams(params);
-            }
             content.setPadding(
                     content.getPaddingLeft(),
                     baseTop + top,
@@ -1220,6 +1210,9 @@ public class MainActivity extends Activity {
     }
 
     private void applyAccent(int color) {
+        getWindow().setStatusBarColor(
+                Build.VERSION.SDK_INT >= 35
+                        ? Color.TRANSPARENT : BackdropView.topBarColor(color));
         View addButton = findViewById(R.id.addButton);
         int lighter = Color.rgb(
                 Color.red(color) + (255 - Color.red(color)) / 5,
@@ -1296,12 +1289,15 @@ public class MainActivity extends Activity {
                             ? CloudSyncClient.signUp(username, password)
                             : CloudSyncClient.signIn(username, password);
                     AccountSessionStore.save(getApplicationContext(), session);
-                    synchronizeWithCloud(session);
+                    int serverCount = synchronizeWithCloud(session);
                     handler.post(() -> {
                         updateAccountButton();
                         accountButton.setEnabled(true);
                         buildCards();
-                        Toast.makeText(this, "Серверы синхронизированы.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(
+                                this,
+                                "Синхронизировано серверов: " + serverCount,
+                                Toast.LENGTH_SHORT).show();
                     });
                 } catch (Exception exception) {
                     Log.e(TAG, "Ошибка входа или синхронизации аккаунта", exception);
@@ -1336,14 +1332,17 @@ public class MainActivity extends Activity {
                         return;
                     }
                     try {
-                        synchronizeWithCloud(session);
+                        int serverCount = synchronizeWithCloud(session);
                         AccountSessionStore.save(getApplicationContext(), session);
                         boolean showMessage = showResult;
                         handler.post(() -> {
                             updateAccountButton();
                             buildCards();
                             if (showMessage) {
-                                Toast.makeText(this, "Серверы синхронизированы.", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(
+                                        this,
+                                        "Синхронизировано серверов: " + serverCount,
+                                        Toast.LENGTH_SHORT).show();
                             }
                         });
                     } catch (Exception exception) {
@@ -1383,7 +1382,7 @@ public class MainActivity extends Activity {
             handler.post(() -> accountButton.setEnabled(true));
         }
 
-        private void synchronizeWithCloud(AccountSession session) throws Exception {
+        private int synchronizeWithCloud(AccountSession session) throws Exception {
             Context context = getApplicationContext();
             String previousOwner = AccountSessionStore.lastOwnerId(context);
             List<ServerEntry> local = ServerStore.load(context);
@@ -1405,6 +1404,7 @@ public class MainActivity extends Activity {
             CloudSyncClient.saveServers(session, merged);
             AccountSessionStore.saveBaseServers(context, merged);
             AccountSessionStore.save(context, session);
+            return merged.size();
         }
 
         private String cloudErrorMessage(Exception exception) {

@@ -104,6 +104,13 @@ public final class AccountSessionStore {
         List<ServerEntry> result = new ArrayList<>();
         for (int i = 0; i < array.length(); i++) {
             JSONObject item = array.optJSONObject(i);
+            if (item == null
+                    || !item.has("protocol")
+                    || !item.has("group_id")
+                    || !item.has("show_in_widget")
+                    || !item.has("priority_players")) {
+                return null;
+            }
             ServerEntry entry = ServerEntry.fromJson(item);
             if (entry == null) {
                 throw new JSONException("Некорректный сервер в снимке синхронизации");
@@ -113,17 +120,11 @@ public final class AccountSessionStore {
         return result;
     }
 
-    public static synchronized void saveBaseServers(Context context, List<ServerEntry> servers) {
+    public static synchronized void saveBaseServers(Context context, List<ServerEntry> servers)
+            throws JSONException {
         JSONArray array = new JSONArray();
         for (ServerEntry entry : servers) {
-            JSONObject json = new JSONObject();
-            try {
-                json.put("address", entry.address);
-                json.put("name", entry.name == null ? "" : entry.name);
-                array.put(json);
-            } catch (JSONException exception) {
-                Log.w(TAG, "Не удалось сохранить сервер в снимке синхронизации", exception);
-            }
+            array.put(entry.toJson());
         }
         prefs(context).edit().putString(KEY_BASE, array.toString()).apply();
     }
