@@ -3,6 +3,7 @@ package com.mcmonitor.app;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
+import android.app.TimePickerDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.Insets;
@@ -51,6 +52,9 @@ public class SettingsActivity extends Activity {
     private Button updateButton;
     private TextView updateStatus;
     private ProgressBar updateProgress;
+    private Button notificationStartButton;
+    private Button notificationEndButton;
+    private TextView dndStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -111,6 +115,26 @@ public class SettingsActivity extends Activity {
                                     ? Color.TRANSPARENT : BackdropView.topBarColor(color));
                 });
 
+        addSection("УВЕДОМЛЕНИЯ");
+        addHint("Уведомления о приоритетных никах приходят только в выбранное время.");
+        notificationStartButton = new Button(this);
+        notificationStartButton.setOnClickListener(v -> chooseNotificationTime(true));
+        content.addView(notificationStartButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+        notificationEndButton = new Button(this);
+        notificationEndButton.setOnClickListener(v -> chooseNotificationTime(false));
+        content.addView(notificationEndButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+        dndStatus = text("", 12, 0xFF929A97);
+        dndStatus.setPadding(0, dp(6), 0, dp(6));
+        content.addView(dndStatus);
+        Button dndButton = new Button(this);
+        dndButton.setText("Режим «Не беспокоить»");
+        dndButton.setOnClickListener(v -> showDndOptions());
+        content.addView(dndButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+        updateNotificationLabels();
+
         addSection("ВИДЖЕТЫ");
         addHint("Цвета и видимая информация сохраняются на устройстве и сразу применяются.");
         addColorChoices(WidgetSettingsStore.ACCENT_NAMES,
@@ -150,6 +174,81 @@ public class SettingsActivity extends Activity {
         updateStatus.setPadding(0, dp(4), 0, 0);
         content.addView(updateStatus);
         applyWindowInsets();
+    }
+
+    private void chooseNotificationTime(boolean start) {
+        int minute = start
+                ? NotificationPolicy.startMinute(this)
+                : NotificationPolicy.endMinute(this);
+        int hour = minute == 1440 ? 0 : minute / 60;
+        int selectedMinute = minute % 60;
+        new TimePickerDialog(
+                this,
+                (picker, selectedHour, selectedMinuteValue) -> {
+                    int selected = selectedHour * 60 + selectedMinuteValue;
+                    if (start) {
+                        NotificationPolicy.setStartMinute(this, selected);
+                    } else {
+                        NotificationPolicy.setEndMinute(
+                                this,
+                                selected == 0
+                                        && NotificationPolicy.startMinute(this) == 0
+                                        ? 1440 : selected);
+                    }
+                    updateNotificationLabels();
+                },
+                hour,
+                selectedMinute,
+                android.text.format.DateFormat.is24HourFormat(this))
+                .show();
+    }
+
+    private void showDndOptions() {
+        String[] options = {
+                "Выключить",
+                "На 1 час",
+                "На 3 часа",
+                "На 8 часов",
+                "Пока не отключу"
+        };
+        int[] durations = {0, 3600, 3 * 3600, 8 * 3600, -1};
+        new AlertDialog.Builder(this)
+                .setTitle("Не беспокоить")
+                .setItems(options, (dialog, which) -> {
+                    NotificationPolicy.setDndDuration(this, durations[which]);
+                    updateNotificationLabels();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
+    }
+
+    private void updateNotificationLabels() {
+        if (notificationStartButton == null || notificationEndButton == null) {
+            return;
+        }
+        notificationStartButton.setText(
+                "Уведомления с " + formatMinute(NotificationPolicy.startMinute(this)));
+        int end = NotificationPolicy.endMinute(this);
+        notificationEndButton.setText(
+                "Уведомления до " + (end == 1440 ? "24:00" : formatMinute(end)));
+        if (dndStatus == null) {
+            return;
+        }
+        long until = NotificationPolicy.dndUntil(this);
+        if (until == -1) {
+            dndStatus.setText("Не беспокоить активно — до отключения вручную.");
+        } else if (until > System.currentTimeMillis()) {
+            String time = android.text.format.DateFormat.getTimeFormat(this)
+                    .format(new java.util.Date(until));
+            dndStatus.setText("Не беспокоить активно до " + time + ".");
+        } else {
+            dndStatus.setText("Не беспокоить выключен.");
+        }
+    }
+
+    private String formatMinute(int minute) {
+        return String.format(java.util.Locale.ROOT, "%02d:%02d",
+                minute / 60, minute % 60);
     }
 
     @Override

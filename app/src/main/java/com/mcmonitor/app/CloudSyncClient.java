@@ -119,7 +119,8 @@ public final class CloudSyncClient {
             throws IOException, JSONException {
         String userId = encode(session.userId);
         JSONArray rows = new JSONArray(requestWithSession(
-                "/rest/v1/profiles?select=id,username,display_name,bio,avatar_path,share_servers"
+                "/rest/v1/profiles?select=id,username,display_name,bio,avatar_path,share_servers,"
+                        + "share_followers,share_friends,share_subscriptions"
                         + "&id=eq." + userId,
                 "GET",
                 null,
@@ -132,11 +133,40 @@ public final class CloudSyncClient {
         return profileFrom(rows.optJSONObject(0));
     }
 
+    public static PublicProfile fetchPublicProfile(AccountSession session, String targetId)
+            throws IOException, JSONException {
+        String target = validateUserId(targetId);
+        JSONArray rows = new JSONArray(requestWithSession(
+                "/rest/v1/profiles?select=id,username,display_name,bio,avatar_path,share_servers,"
+                        + "share_followers,share_friends,share_subscriptions"
+                        + "&id=eq." + encode(target),
+                "GET",
+                null,
+                session,
+                null));
+        if (rows.length() == 0 || rows.optJSONObject(0) == null) {
+            throw new IOException("Этот профиль больше недоступен.");
+        }
+        return profileFrom(rows.optJSONObject(0));
+    }
+
     public static PublicProfile updateProfile(
             AccountSession session,
             String displayName,
             String bio,
             boolean shareServers) throws IOException, JSONException {
+        return updateProfile(
+                session, displayName, bio, shareServers, false, false, false);
+    }
+
+    public static PublicProfile updateProfile(
+            AccountSession session,
+            String displayName,
+            String bio,
+            boolean shareServers,
+            boolean shareFollowers,
+            boolean shareFriends,
+            boolean shareSubscriptions) throws IOException, JSONException {
         String cleanName = displayName == null ? "" : displayName.trim();
         String cleanBio = bio == null ? "" : bio.trim();
         if (cleanName.length() > 32) {
@@ -151,6 +181,9 @@ public final class CloudSyncClient {
         body.put("display_name", cleanName);
         body.put("bio", cleanBio);
         body.put("share_servers", shareServers);
+        body.put("share_followers", shareFollowers);
+        body.put("share_friends", shareFriends);
+        body.put("share_subscriptions", shareSubscriptions);
         JSONArray rows = new JSONArray(requestWithSession(
                 "/rest/v1/profiles?id=eq." + encode(session.userId),
                 "PATCH",
@@ -161,6 +194,55 @@ public final class CloudSyncClient {
             throw new IOException("Не удалось сохранить профиль. Проверь права Supabase.");
         }
         return profileFrom(rows.optJSONObject(0));
+    }
+
+    public static ProfileSocialSummary getProfileSocialSummary(
+            AccountSession session, String targetId) throws IOException, JSONException {
+        String target = validateUserId(targetId);
+        JSONObject body = new JSONObject();
+        body.put("target_user", target);
+        JSONArray rows = new JSONArray(requestWithSession(
+                "/rest/v1/rpc/get_profile_social_summary", "POST", body, session, null));
+        if (rows.length() != 1 || rows.optJSONObject(0) == null) {
+            throw new IOException("Supabase не вернул данные социальных связей профиля.");
+        }
+        JSONObject row = rows.optJSONObject(0);
+        return new ProfileSocialSummary(
+                checkedCount(row, "followers_count"),
+                checkedCount(row, "subscriptions_count"),
+                checkedCount(row, "friends_count"),
+                row.optBoolean("is_following", false),
+                row.optBoolean("is_followed_by", false),
+                row.optBoolean("can_view_servers", false),
+                row.optBoolean("can_view_followers", false),
+                row.optBoolean("can_view_friends", false),
+                row.optBoolean("can_view_subscriptions", false));
+    }
+
+    public static List<PublicProfile> listProfileRelationships(
+            AccountSession session, String targetId, String relationship)
+            throws IOException, JSONException {
+        String target = validateUserId(targetId);
+        if (!"followers".equals(relationship)
+                && !"friends".equals(relationship)
+                && !"subscriptions".equals(relationship)) {
+            throw new IllegalArgumentException("Неизвестный тип списка профиля.");
+        }
+        JSONObject body = new JSONObject();
+        body.put("target_user", target);
+        body.put("relationship", relationship);
+        body.put("result_limit", 50);
+        return parseProfiles(requestWithSession(
+                "/rest/v1/rpc/list_profile_relationships", "POST", body, session, null));
+    }
+
+    private static int checkedCount(JSONObject row, String key) throws IOException {
+        Object value = row.opt(key);
+        if (!(value instanceof Number) || ((Number) value).longValue() < 0
+                || ((Number) value).longValue() > Integer.MAX_VALUE) {
+            throw new IOException("Supabase вернул неверный счётчик профиля.");
+        }
+        return ((Number) value).intValue();
     }
 
     public static List<PublicProfile> searchProfiles(
@@ -369,7 +451,11 @@ public final class CloudSyncClient {
                 row.optString("bio", ""),
                 avatarPath,
                 row.optBoolean("share_servers", false),
-                row.optBoolean("is_following", false));
+                row.optBoolean("is_following", false),
+                row.optBoolean("share_followers", false),
+                row.optBoolean("share_friends", false),
+                row.optBoolean("share_subscriptions", false),
+                row.optBoolean("is_followed_by", false));
     }
 
     private static List<PublicServer> parsePublicServers(String raw, String ownerFallback)
@@ -784,6 +870,10 @@ public final class CloudSyncClient {
         public final String avatarPath;
         public final boolean shareServers;
         public final boolean isFollowing;
+        public final boolean shareFollowers;
+        public final boolean shareFriends;
+        public final boolean shareSubscriptions;
+        public final boolean isFollowedBy;
 
         private PublicProfile(
                 String userId,
@@ -792,7 +882,11 @@ public final class CloudSyncClient {
                 String bio,
                 String avatarPath,
                 boolean shareServers,
-                boolean isFollowing) {
+                boolean isFollowing,
+                boolean shareFollowers,
+                boolean shareFriends,
+                boolean shareSubscriptions,
+                boolean isFollowedBy) {
             this.userId = userId;
             this.username = username;
             this.displayName = displayName;
@@ -800,6 +894,43 @@ public final class CloudSyncClient {
             this.avatarPath = avatarPath;
             this.shareServers = shareServers;
             this.isFollowing = isFollowing;
+            this.shareFollowers = shareFollowers;
+            this.shareFriends = shareFriends;
+            this.shareSubscriptions = shareSubscriptions;
+            this.isFollowedBy = isFollowedBy;
+        }
+    }
+
+    public static final class ProfileSocialSummary {
+        public final int followersCount;
+        public final int subscriptionsCount;
+        public final int friendsCount;
+        public final boolean isFollowing;
+        public final boolean isFollowedBy;
+        public final boolean canViewServers;
+        public final boolean canViewFollowers;
+        public final boolean canViewFriends;
+        public final boolean canViewSubscriptions;
+
+        private ProfileSocialSummary(
+                int followersCount,
+                int subscriptionsCount,
+                int friendsCount,
+                boolean isFollowing,
+                boolean isFollowedBy,
+                boolean canViewServers,
+                boolean canViewFollowers,
+                boolean canViewFriends,
+                boolean canViewSubscriptions) {
+            this.followersCount = followersCount;
+            this.subscriptionsCount = subscriptionsCount;
+            this.friendsCount = friendsCount;
+            this.isFollowing = isFollowing;
+            this.isFollowedBy = isFollowedBy;
+            this.canViewServers = canViewServers;
+            this.canViewFollowers = canViewFollowers;
+            this.canViewFriends = canViewFriends;
+            this.canViewSubscriptions = canViewSubscriptions;
         }
     }
 

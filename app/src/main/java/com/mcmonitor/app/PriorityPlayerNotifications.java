@@ -37,6 +37,8 @@ public final class PriorityPlayerNotifications {
                 || !previous.online
                 || !current.hasData
                 || !current.online
+                || !NotificationPolicy.notificationsAllowed(
+                        context, System.currentTimeMillis())
                 || server.priorityPlayers == null
                 || server.priorityPlayers.isEmpty()
                 || (Build.VERSION.SDK_INT >= 33

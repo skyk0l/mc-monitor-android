@@ -233,6 +233,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         applySavedAccent();
+        updateAccountButton();
         ensurePriorityNotificationPermission();
         WidgetJobService.schedule(this);
         refreshAll();
@@ -756,7 +757,7 @@ public class MainActivity extends Activity {
                 .setTitle(session.username)
                 .setItems(options, (dialog, which) -> {
                     if (which == 0) {
-                        showProfileDialog(session);
+                        startActivity(new Intent(this, ProfileActivity.class));
                     } else if (which == 1) {
                         showCommunityDialog(session, false);
                     } else if (which == 2) {
@@ -1185,6 +1186,11 @@ public class MainActivity extends Activity {
                     ? profile.username : profile.displayName + "  @" + profile.username));
             title.setTextColor(getColor(R.color.soft));
             title.setTextSize(15);
+            title.setOnClickListener(v -> {
+                Intent intent = new Intent(this, ProfileActivity.class);
+                intent.putExtra(ProfileActivity.EXTRA_PROFILE_ID, profile.userId);
+                startActivity(intent);
+            });
             LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
             titleParams.leftMargin = dp(10);
