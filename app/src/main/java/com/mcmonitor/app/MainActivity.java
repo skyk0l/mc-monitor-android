@@ -36,6 +36,7 @@ import android.widget.Button;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
@@ -45,6 +46,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
@@ -62,7 +65,7 @@ public class MainActivity extends Activity {
     private static final String NOTIFICATION_SETTINGS_PROMPTED =
             "priority_notification_settings_prompted";
 
-    private static final long REFRESH_INTERVAL = 60_000L;
+    private static final long REFRESH_INTERVAL = 15_000L;
     private static final long CLOUD_SYNC_INTERVAL = 5 * 60_000L;
     private static final int MAX_CHIPS = 30;
 
@@ -90,6 +93,10 @@ public class MainActivity extends Activity {
 
     private final Map<String, View> cardViews = new java.util.HashMap<>();
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
+    private final java.util.Set<String> inFlightAddresses =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.Set<String> accountAvatarRequests =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Object syncLock = new Object();
@@ -640,10 +647,90 @@ public class MainActivity extends Activity {
 
     private void updateAccountButton() {
         AccountSession session = AccountSessionStore.load(this);
+        ImageButton button = (ImageButton) accountButton;
+        button.setClipToOutline(true);
         accountButton.setContentDescription(session == null
                 ? "Профиль: войти или создать аккаунт"
                 : "Профиль " + session.username);
         accountButton.setSelected(session != null);
+        if (session == null) {
+            button.setImageResource(R.drawable.ic_profile);
+            button.setColorFilter(getColor(R.color.soft));
+            button.setPadding(dp(10), dp(10), dp(10), dp(10));
+            return;
+        }
+
+        File cachedAvatar = accountAvatarFile(session.userId);
+        Bitmap cached = BitmapFactory.decodeFile(cachedAvatar.getAbsolutePath());
+        if (cached != null) {
+            button.setImageBitmap(cached);
+            button.clearColorFilter();
+            button.setPadding(0, 0, 0, 0);
+        } else {
+            button.setImageResource(R.drawable.ic_profile);
+            button.setColorFilter(getColor(R.color.soft));
+            button.setPadding(dp(10), dp(10), dp(10), dp(10));
+        }
+        loadAccountAvatar(session);
+    }
+
+    private File accountAvatarFile(String userId) {
+        return new File(new File(getCacheDir(), "avatars"), userId + ".jpg");
+    }
+
+    private void loadAccountAvatar(AccountSession session) {
+        String userId = session.userId;
+        if (!accountAvatarRequests.add(userId)) {
+            return;
+        }
+        executor.execute(() -> {
+            Bitmap avatar = null;
+            try {
+                CloudSyncClient.PublicProfile profile = CloudSyncClient.fetchProfile(session);
+                byte[] data = CloudSyncClient.downloadAvatar(profile);
+                File file = accountAvatarFile(userId);
+                if (data == null) {
+                    if (file.exists() && !file.delete()) {
+                        Log.w(TAG, "Не удалось удалить устаревший кэш аватара");
+                    }
+                } else {
+                    File parent = file.getParentFile();
+                    if (parent == null) {
+                        throw new IOException("Не удалось определить папку кэша аватара.");
+                    }
+                    if (!parent.isDirectory() && !parent.mkdirs()) {
+                        throw new IOException("Не удалось создать кэш аватара.");
+                    }
+                    try (FileOutputStream output = new FileOutputStream(file)) {
+                        output.write(data);
+                    }
+                    avatar = BitmapFactory.decodeByteArray(data, 0, data.length);
+                }
+            } catch (Exception exception) {
+                Log.w(TAG, "Не удалось обновить аватар в шапке", exception);
+            } finally {
+                accountAvatarRequests.remove(userId);
+            }
+
+            Bitmap result = avatar;
+            handler.post(() -> {
+                AccountSession current = AccountSessionStore.load(this);
+                if (isFinishing() || isDestroyed() || current == null
+                        || !userId.equals(current.userId)) {
+                    return;
+                }
+                ImageButton button = (ImageButton) accountButton;
+                if (result != null) {
+                    button.setImageBitmap(result);
+                    button.clearColorFilter();
+                    button.setPadding(0, 0, 0, 0);
+                } else if (!accountAvatarFile(userId).isFile()) {
+                    button.setImageResource(R.drawable.ic_profile);
+                    button.setColorFilter(getColor(R.color.soft));
+                    button.setPadding(dp(10), dp(10), dp(10), dp(10));
+                }
+            });
+        });
     }
 
     private void showAccountMenu() {
@@ -843,6 +930,8 @@ public class MainActivity extends Activity {
                     if (profileDialog != null) {
                         profileDialog.dismiss();
                     }
+                    accountAvatarRequests.remove(session.userId);
+                    updateAccountButton();
                     Toast.makeText(this, "Профиль сохранён.", Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception exception) {
@@ -1463,6 +1552,9 @@ public class MainActivity extends Activity {
         final String entryId = entry.id;
         final String address = entry.address;
         final String protocol = ServerEntry.normalizeProtocol(entry.protocol);
+        if (!inFlightAddresses.add(address)) {
+            return;
+        }
 
         View card = cardViews.get(entryId);
         if (card != null) {
@@ -1471,15 +1563,19 @@ public class MainActivity extends Activity {
         }
 
         executor.execute(() -> {
-            ServerStatus previous = StatusCache.load(getApplicationContext(), address);
-            final ServerStatus status = MinecraftApi.fetch(address, protocol);
-            PriorityPlayerNotifications.notifyChanges(
-                    getApplicationContext(),
-                    ServerStore.findByAddress(getApplicationContext(), address),
-                    previous,
-                    status);
-            StatusCache.save(getApplicationContext(), status);
-            handler.post(() -> applyStatus(entryId, address, status));
+            try {
+                ServerStatus previous = StatusCache.load(getApplicationContext(), address);
+                final ServerStatus status = MinecraftApi.fetch(address, protocol);
+                PriorityPlayerNotifications.notifyChanges(
+                        getApplicationContext(),
+                        ServerStore.findByAddress(getApplicationContext(), address),
+                        previous,
+                        status);
+                StatusCache.save(getApplicationContext(), status);
+                handler.post(() -> applyStatus(entryId, address, status));
+            } finally {
+                inFlightAddresses.remove(address);
+            }
         });
     }
 

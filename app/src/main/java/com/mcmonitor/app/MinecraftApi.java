@@ -18,8 +18,8 @@ public final class MinecraftApi {
     private static final String MCSTATUS_BEDROCK = "https://api.mcstatus.io/v2/status/bedrock/";
     private static final String MCSRVSTAT = "https://api.mcsrvstat.us/3/";
     private static final String MCSRVSTAT_BEDROCK = "https://api.mcsrvstat.us/bedrock/3/";
-    private static final int CONNECT_TIMEOUT = 6000;
-    private static final int READ_TIMEOUT = 8000;
+    private static final int CONNECT_TIMEOUT = 3000;
+    private static final int READ_TIMEOUT = 3500;
 
     private MinecraftApi() {
     }
@@ -259,8 +259,11 @@ public final class MinecraftApi {
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(CONNECT_TIMEOUT);
             connection.setReadTimeout(READ_TIMEOUT);
+            connection.setUseCaches(false);
             connection.setInstanceFollowRedirects(true);
             connection.setRequestProperty("Accept", "application/json");
+            connection.setRequestProperty("Cache-Control", "no-cache");
+            connection.setRequestProperty("Pragma", "no-cache");
             connection.setRequestProperty("User-Agent", "MC-Monitor/1.0 (Android)");
 
             int code = connection.getResponseCode();
