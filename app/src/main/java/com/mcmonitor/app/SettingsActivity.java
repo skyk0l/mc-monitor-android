@@ -135,6 +135,37 @@ public class SettingsActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
         updateNotificationLabels();
 
+        addSection("СПИСОК СЕРВЕРОВ");
+        addHint("Закреплённые серверы всегда отображаются первыми. Для ручного порядка удерживай название и перетаскивай карточку.");
+        Button sortButton = new Button(this);
+        updateSortLabel(sortButton);
+        sortButton.setOnClickListener(v -> {
+            String[] labels = {"Вручную", "По имени", "По онлайну", "По дате добавления"};
+            String[] values = {"manual", "name", "online", "date"};
+            String selected = getSharedPreferences(PREFERENCES, MODE_PRIVATE)
+                    .getString("server_sort_mode", "manual");
+            int selectedIndex = 0;
+            for (int i = 0; i < values.length; i++) {
+                if (values[i].equals(selected)) {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+            new AlertDialog.Builder(this)
+                    .setTitle("Сортировка серверов")
+                    .setSingleChoiceItems(labels, selectedIndex, (dialog, which) -> {
+                        getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit()
+                                .putString("server_sort_mode", values[which])
+                                .apply();
+                        updateSortLabel(sortButton);
+                        dialog.dismiss();
+                    })
+                    .setNegativeButton("Отмена", null)
+                    .show();
+        });
+        content.addView(sortButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+
         addSection("ВИДЖЕТЫ");
         addHint("Цвета и видимая информация сохраняются на устройстве и сразу применяются.");
         addColorChoices(WidgetSettingsStore.ACCENT_NAMES,
@@ -244,6 +275,27 @@ public class SettingsActivity extends Activity {
         } else {
             dndStatus.setText("Не беспокоить выключен.");
         }
+    }
+
+    private void updateSortLabel(Button button) {
+        String mode = getSharedPreferences(PREFERENCES, MODE_PRIVATE)
+                .getString("server_sort_mode", "manual");
+        String label;
+        switch (mode) {
+            case "name":
+                label = "По имени";
+                break;
+            case "online":
+                label = "По онлайну";
+                break;
+            case "date":
+                label = "По дате добавления";
+                break;
+            default:
+                label = "Вручную";
+                break;
+        }
+        button.setText("Сортировка: " + label);
     }
 
     private String formatMinute(int minute) {

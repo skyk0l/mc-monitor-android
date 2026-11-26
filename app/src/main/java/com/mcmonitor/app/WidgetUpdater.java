@@ -26,6 +26,7 @@ public final class WidgetUpdater {
     public static final int KIND_2X2 = WidgetStore.KIND_2X2;
     public static final int KIND_2X1 = WidgetStore.KIND_2X1;
     public static final int KIND_3X3 = WidgetStore.KIND_3X3;
+    public static final int KIND_GROUP = WidgetStore.KIND_GROUP;
 
     private static final int COLOR_TEXT = 0xFFE6E9E5;
     private static final int COLOR_MINT = 0xFFA7C6A4;
@@ -43,6 +44,9 @@ public final class WidgetUpdater {
         if (kind == KIND_3X3) {
             return Widget3x3Provider.class;
         }
+        if (kind == KIND_GROUP) {
+            return GroupWidgetProvider.class;
+        }
         return Widget2x2Provider.class;
     }
 
@@ -53,6 +57,9 @@ public final class WidgetUpdater {
         if (providerClass == Widget3x3Provider.class) {
             return KIND_3X3;
         }
+        if (providerClass == GroupWidgetProvider.class) {
+            return KIND_GROUP;
+        }
         return KIND_2X2;
     }
 
@@ -62,6 +69,9 @@ public final class WidgetUpdater {
         }
         if (kind == KIND_3X3) {
             return R.layout.widget_remote_3x3;
+        }
+        if (kind == KIND_GROUP) {
+            return R.layout.widget_remote_group;
         }
         return R.layout.widget_remote_2x2;
     }
@@ -85,7 +95,7 @@ public final class WidgetUpdater {
         for (Map.Entry<Integer, WidgetStore.Info> entry : WidgetStore.all(app).entrySet()) {
             try {
                 render(app, entry.getKey(), entry.getValue().kind, entry.getValue().address,
-                        refreshing);
+                        refreshing, entry.getValue().groupId);
             } catch (RuntimeException exception) {
                 Log.e(TAG, "Не удалось обновить виджет " + entry.getKey(), exception);
                 showLoading(app, entry.getKey(), entry.getValue().kind);
@@ -99,9 +109,9 @@ public final class WidgetUpdater {
 
     public static void showLoading(Context context, int widgetId, int kind) {
         try {
-            RemoteViews views = new RemoteViews(
-                    context.getPackageName(),
-                    kind == KIND_2X1 ? R.layout.widget_loading_2x1 : R.layout.widget_loading);
+            int layout = kind == KIND_GROUP ? R.layout.widget_remote_group
+                    : kind == KIND_2X1 ? R.layout.widget_loading_2x1 : R.layout.widget_loading;
+            RemoteViews views = new RemoteViews(context.getPackageName(), layout);
             AppWidgetManager.getInstance(context).updateAppWidget(
                     widgetId, views);
         } catch (RuntimeException exception) {
@@ -117,7 +127,7 @@ public final class WidgetUpdater {
             return;
         }
         AppWidgetManager manager = AppWidgetManager.getInstance(app);
-        for (int kind = KIND_2X2; kind <= KIND_3X3; kind++) {
+        for (int kind = KIND_2X2; kind <= KIND_GROUP; kind++) {
             if (WidgetStore.hasPending(app, kind)) {
                 continue;
             }
@@ -125,7 +135,15 @@ public final class WidgetUpdater {
                     new ComponentName(app, providerClass(kind)));
             for (int widgetId : ids) {
                 if (WidgetStore.get(app, widgetId) == null) {
-                    WidgetStore.put(app, widgetId, servers.get(0).address, kind);
+                    if (kind == KIND_GROUP) {
+                        ServerEntry grouped = firstGroupedServer(servers);
+                        if (grouped != null) {
+                            WidgetStore.putGroup(
+                                    app, widgetId, grouped.groupId, grouped.address);
+                        }
+                    } else {
+                        WidgetStore.put(app, widgetId, servers.get(0).address, kind);
+                    }
                 }
             }
         }
@@ -134,7 +152,7 @@ public final class WidgetUpdater {
     /** Есть ли вообще хоть один виджет на экране. */
     public static boolean hasWidgets(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
-        for (int kind = KIND_2X2; kind <= KIND_3X3; kind++) {
+        for (int kind = KIND_2X2; kind <= KIND_GROUP; kind++) {
             if (manager.getAppWidgetIds(new ComponentName(context, providerClass(kind))).length > 0) {
                 return true;
             }
@@ -148,7 +166,7 @@ public final class WidgetUpdater {
         if (info == null) {
             return;
         }
-        render(app, widgetId, info.kind, info.address, false);
+        render(app, widgetId, info.kind, info.address, false, info.groupId);
         if (fetch) {
             refreshWidgetAsync(app, widgetId);
         }
@@ -175,10 +193,17 @@ public final class WidgetUpdater {
         renderAllRefreshing(app);
 
         Set<String> addresses = new HashSet<>();
+        List<ServerEntry> servers = ServerStore.load(app);
         for (WidgetStore.Info info : WidgetStore.all(app).values()) {
             addresses.add(info.address);
+            if (info.kind == KIND_GROUP && !info.groupId.isEmpty()) {
+                for (ServerEntry server : servers) {
+                    if (info.groupId.equals(server.groupId)) {
+                        addresses.add(server.address);
+                    }
+                }
+            }
         }
-        List<ServerEntry> servers = ServerStore.load(app);
         for (ServerEntry server : servers) {
             if (server.priorityPlayers != null && !server.priorityPlayers.isEmpty()) {
                 addresses.add(server.address);
@@ -208,18 +233,28 @@ public final class WidgetUpdater {
     }
 
     private static void render(
-            Context context, int widgetId, int kind, String address, boolean refreshing) {
+            Context context,
+            int widgetId,
+            int kind,
+            String address,
+            boolean refreshing,
+            String groupId) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         if (manager.getAppWidgetInfo(widgetId) == null) {
             // Виджет мог ещё не успеть зарегистрироваться — привязку не теряем,
             // её подхватит ближайший onUpdate.
             return;
         }
-        RemoteViews views = build(context, widgetId, kind, address, refreshing);
+        RemoteViews views = kind == KIND_GROUP
+                ? buildGroup(context, widgetId, groupId)
+                : build(context, widgetId, kind, address, refreshing);
         manager.updateAppWidget(widgetId, views);
+        if (kind == KIND_GROUP) {
+            manager.notifyAppWidgetViewDataChanged(widgetId, R.id.groupStack);
+        }
     }
 
-    private static RemoteViews build(
+    static RemoteViews build(
             Context context, int widgetId, int kind, String address, boolean refreshing) {
         RemoteViews views = new RemoteViews(context.getPackageName(), layoutFor(kind));
 
@@ -307,6 +342,53 @@ public final class WidgetUpdater {
         views.setOnClickPendingIntent(R.id.wRefresh, refreshPending);
 
         return views;
+    }
+
+    private static RemoteViews buildGroup(Context context, int widgetId, String groupId) {
+        RemoteViews views = new RemoteViews(
+                context.getPackageName(), R.layout.widget_remote_group);
+        int backgroundIndex = WidgetSettingsStore.background(context);
+        if (backgroundIndex < 0 || backgroundIndex >= WIDGET_BACKGROUNDS.length) {
+            backgroundIndex = 0;
+        }
+        views.setInt(
+                R.id.groupRoot, "setBackgroundColor", WIDGET_BACKGROUNDS[backgroundIndex]);
+        views.setTextViewText(R.id.groupTitle, groupId == null ? "" : groupId);
+
+        Intent adapter = new Intent(context, GroupWidgetRemoteViewsService.class)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                .putExtra("group_id", groupId);
+        adapter.setData(Uri.parse(
+                "mcmonitor://group-widget/" + widgetId + "/"
+                        + Uri.encode(groupId == null ? "" : groupId)));
+        views.setRemoteAdapter(R.id.groupStack, adapter);
+        views.setEmptyView(R.id.groupStack, R.id.groupEmpty);
+
+        Intent openIntent = new Intent(context, MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent openPending = PendingIntent.getActivity(
+                context, 3000 + widgetId, openIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        views.setOnClickPendingIntent(R.id.groupRoot, openPending);
+
+        Intent refreshIntent = new Intent(context, WidgetRefreshReceiver.class)
+                .setAction(WidgetRefreshReceiver.ACTION_REFRESH)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
+        refreshIntent.setData(Uri.parse("mcmonitor://widget-refresh/" + widgetId));
+        PendingIntent refreshPending = PendingIntent.getBroadcast(
+                context, 2000 + widgetId, refreshIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        views.setOnClickPendingIntent(R.id.groupRefresh, refreshPending);
+        return views;
+    }
+
+    private static ServerEntry firstGroupedServer(List<ServerEntry> servers) {
+        for (ServerEntry server : servers) {
+            if (server.groupId != null && !server.groupId.trim().isEmpty()) {
+                return server;
+            }
+        }
+        return null;
     }
 
     private static String statusText(ServerStatus status, boolean refreshing) {

@@ -24,6 +24,19 @@ public abstract class BaseWidgetProvider extends AppWidgetProvider {
                 if (WidgetStore.get(context, widgetId) != null) {
                     continue;
                 }
+                if (kind() == WidgetStore.KIND_GROUP) {
+                    if (WidgetStore.hasPending(context, kind())) {
+                        continue;
+                    }
+                    for (ServerEntry server : ServerStore.load(context)) {
+                        if (server.groupId != null && !server.groupId.trim().isEmpty()) {
+                            WidgetStore.putGroup(
+                                    context, widgetId, server.groupId, server.address);
+                            break;
+                        }
+                    }
+                    continue;
+                }
                 String pending = WidgetStore.claimPending(context, kind());
                 if (pending != null) {
                     WidgetStore.put(context, widgetId, pending, kind());

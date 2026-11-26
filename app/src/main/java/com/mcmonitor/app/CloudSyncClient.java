@@ -47,13 +47,62 @@ public final class CloudSyncClient {
 
     public static AccountSession signIn(String username, String password)
             throws IOException, JSONException {
-        validateCredentials(username, password);
+        String identifier = validateLoginIdentifier(username, password);
         JSONObject body = new JSONObject();
-        body.put("email", syntheticEmail(username));
+        body.put("email", identifier.indexOf('@') >= 0
+                ? identifier : syntheticEmail(identifier));
         body.put("password", password);
         JSONObject response = request(
                 "/auth/v1/token?grant_type=password", "POST", body, null, null);
-        return sessionFrom(response, username.trim());
+        String fallbackUsername = identifier.indexOf('@') >= 0
+                ? identifier.substring(0, identifier.indexOf('@')) : identifier;
+        return sessionFrom(response, fallbackUsername);
+    }
+
+    public static void requestEmailSignupCode(String email)
+            throws IOException, JSONException {
+        String cleanEmail = validateEmail(email);
+        JSONObject body = new JSONObject();
+        body.put("email", cleanEmail);
+        body.put("create_user", true);
+        request("/auth/v1/otp", "POST", body, null, null);
+    }
+
+    public static AccountSession completeEmailSignup(
+            String email, String code, String username, String password)
+            throws IOException, JSONException {
+        String cleanEmail = validateEmail(email);
+        validateCredentials(username, password);
+        String cleanCode = code == null ? "" : code.trim();
+        if (!cleanCode.matches("[0-9]{4,10}")) {
+            throw new IllegalArgumentException("Введи код из письма.");
+        }
+
+        JSONObject verifyBody = new JSONObject();
+        verifyBody.put("email", cleanEmail);
+        verifyBody.put("token", cleanCode);
+        verifyBody.put("type", "signup");
+        AccountSession session = sessionFrom(
+                request("/auth/v1/verify", "POST", verifyBody, null, null),
+                username.trim());
+
+        JSONObject userBody = new JSONObject();
+        userBody.put("password", password);
+        JSONObject metadata = new JSONObject();
+        metadata.put("username", username.trim());
+        userBody.put("data", metadata);
+        requestWithSession("/auth/v1/user", "PUT", userBody, session, null);
+
+        JSONObject profileBody = new JSONObject();
+        profileBody.put("target_username", username.trim());
+        requestWithSession(
+                "/rest/v1/rpc/complete_email_registration",
+                "POST",
+                profileBody,
+                session,
+                null);
+        session.username = username.trim();
+        return session;
     }
 
     public static List<ServerEntry> fetchServers(AccountSession session)
@@ -88,6 +137,229 @@ public final class CloudSyncClient {
                 body,
                 session,
                 "resolution=merge-duplicates,return=minimal");
+    }
+
+    public static long addServerToCatalog(
+            String address, String name, String protocol) throws IOException, JSONException {
+        String cleanAddress = address == null ? "" : address.trim().toLowerCase(Locale.ROOT);
+        String cleanName = name == null ? "" : name.trim();
+        String cleanProtocol = protocol == null
+                ? "java" : protocol.trim().toLowerCase(Locale.ROOT);
+        if (!"java".equals(cleanProtocol) && !"bedrock".equals(cleanProtocol)) {
+            throw new IllegalArgumentException("Выбран неизвестный протокол сервера.");
+        }
+        if (cleanAddress.length() < 1 || cleanAddress.length() > 253
+                || !cleanAddress.matches("[a-z0-9._:-]+")) {
+            throw new IllegalArgumentException("Укажи корректный адрес сервера.");
+        }
+        if (cleanName.length() > 60) {
+            throw new IllegalArgumentException(
+                    "Название сервера не должно превышать 60 символов.");
+        }
+        JSONObject body = new JSONObject();
+        body.put("server_address", cleanAddress);
+        body.put("server_name", cleanName);
+        body.put("server_protocol", cleanProtocol);
+        String raw = requestText(
+                "/rest/v1/rpc/add_server_to_catalog", "POST", body, null, null).trim();
+        try {
+            long id = Long.parseLong(raw);
+            if (id > 0) {
+                return id;
+            }
+        } catch (NumberFormatException ignored) {
+            // Report the malformed API response below.
+        }
+        throw new IOException("Каталог серверов вернул неверный идентификатор.");
+    }
+
+    public static List<CatalogServer> listServerCatalog(
+            String query, String sortBy, int limit, AccountSession session)
+            throws IOException, JSONException {
+        String cleanQuery = query == null ? "" : query.trim();
+        if (cleanQuery.length() > 80) {
+            throw new IllegalArgumentException("Поисковый запрос слишком длинный.");
+        }
+        if (!"votes".equals(sortBy)
+                && !"newest".equals(sortBy)
+                && !"subscribers".equals(sortBy)
+                && !"online".equals(sortBy)) {
+            throw new IllegalArgumentException("Неизвестный порядок каталога серверов.");
+        }
+        JSONObject body = new JSONObject();
+        body.put("search_term", cleanQuery);
+        body.put("sort_by", sortBy);
+        body.put("result_limit", Math.max(1, Math.min(limit, 100)));
+        String path = "/rest/v1/rpc/list_public_server_catalog";
+        String raw = session == null
+                ? requestText(path, "POST", body, null, null)
+                : requestWithSession(path, "POST", body, session, null);
+        JSONArray rows = new JSONArray(raw);
+        List<CatalogServer> result = new ArrayList<>();
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject row = rows.optJSONObject(i);
+            if (row == null) {
+                throw new IOException("Supabase вернул запись каталога в неверном формате.");
+            }
+            long id = row.optLong("id", 0);
+            String address = row.optString("address", "").trim();
+            String protocol = row.optString("protocol", "").toLowerCase(Locale.ROOT);
+            int votes = row.optInt("votes", -1);
+            int subscribers = row.optInt("subscribers", -1);
+            int onlineCount = row.optInt("online_count", -1);
+            String version = row.optString("version", "");
+            String motd = row.optString("motd", "");
+            String favicon = row.optString("favicon", "");
+            if (id <= 0 || address.isEmpty()
+                    || !address.matches("[A-Za-z0-9._:-]{1,253}")
+                    || votes < 0 || subscribers < 0 || onlineCount < -1
+                    || version.length() > 100 || motd.length() > 2000
+                    || favicon.length() > 60000
+                    || (!favicon.isEmpty()
+                    && !favicon.matches("[A-Za-z0-9+/]+={0,2}"))) {
+                throw new IOException("Supabase вернул некорректный сервер каталога.");
+            }
+            if (!"java".equals(protocol) && !"bedrock".equals(protocol)) {
+                throw new IOException("Supabase вернул неизвестный протокол сервера.");
+            }
+            result.add(new CatalogServer(
+                    id,
+                    row.optString("name", ""),
+                    address,
+                    protocol,
+                    votes,
+                    subscribers,
+                    onlineCount,
+                    row.optBoolean("has_voted_today", false),
+                    version,
+                    motd,
+                    favicon));
+        }
+        return result;
+    }
+
+    public static void reportServerCatalogStatus(
+            AccountSession session, String address, ServerStatus status)
+            throws IOException, JSONException {
+        if (session == null || status == null || !status.hasData) {
+            throw new IllegalArgumentException("Для отчёта нужен подтверждённый статус сервера.");
+        }
+        String cleanAddress = ServerEntry.normalize(address).toLowerCase(Locale.ROOT);
+        if (cleanAddress.length() < 1 || cleanAddress.length() > 253
+                || !cleanAddress.matches("[a-z0-9._:-]+")) {
+            throw new IllegalArgumentException("Укажи корректный адрес сервера.");
+        }
+        if (status.onlineCount < 0 || status.maxCount < 0
+                || (status.maxCount > 0 && status.onlineCount > status.maxCount)) {
+            throw new IllegalArgumentException("Счётчик игроков имеет неверный формат.");
+        }
+        JSONArray players = new JSONArray();
+        if (status.online) {
+            for (String player : status.players) {
+                if (players.length() == 100) {
+                    break;
+                }
+                String cleanPlayer = player == null ? "" : player.trim();
+                if (!cleanPlayer.isEmpty() && cleanPlayer.length() <= 64) {
+                    players.put(cleanPlayer);
+                }
+            }
+        }
+        JSONObject body = new JSONObject();
+        body.put("server_address", cleanAddress);
+        body.put("is_online", status.online);
+        body.put("player_count", status.online ? status.onlineCount : 0);
+        body.put("max_players", status.maxCount);
+        body.put("player_names", players);
+        String version = checkedStatusText(status.version, 100, "Версия сервера");
+        String motd = checkedStatusText(status.motd, 2000, "Описание сервера");
+        String icon = checkedStatusText(status.favicon, 60000, "Иконка сервера");
+        if (!icon.isEmpty() && !icon.matches("[A-Za-z0-9+/]+={0,2}")) {
+            throw new IllegalArgumentException("Иконка сервера имеет неверный формат.");
+        }
+        body.put("server_version", version);
+        body.put("server_motd", motd);
+        body.put("server_icon", icon);
+        requestWithSession(
+                "/rest/v1/rpc/report_server_catalog_status",
+                "POST",
+                body,
+                session,
+                null);
+    }
+
+    private static String checkedStatusText(String value, int maxLength, String label) {
+        if (value == null) {
+            return "";
+        }
+        if (value.length() > maxLength) {
+            throw new IllegalArgumentException(label + " слишком длинная.");
+        }
+        return value.trim();
+    }
+
+    public static List<CatalogHistorySample> listServerCatalogHistory(
+            long serverId, int limit, AccountSession session)
+            throws IOException, JSONException {
+        if (serverId <= 0) {
+            throw new IllegalArgumentException("Выбран неверный сервер.");
+        }
+        JSONObject body = new JSONObject();
+        body.put("target_server_id", serverId);
+        body.put("result_limit", Math.max(1, Math.min(limit, 500)));
+        String path = "/rest/v1/rpc/get_server_catalog_history";
+        String raw = session == null
+                ? requestText(path, "POST", body, null, null)
+                : requestWithSession(path, "POST", body, session, null);
+        JSONArray rows = new JSONArray(raw);
+        List<CatalogHistorySample> result = new ArrayList<>();
+        for (int i = rows.length() - 1; i >= 0; i--) {
+            JSONObject row = rows.optJSONObject(i);
+            if (row == null) {
+                throw new IOException("История сервера имеет неверный формат.");
+            }
+            String sampledAt = row.optString("sampled_at", "");
+            int onlineCount = row.optInt("online_count", -1);
+            int maxCount = row.optInt("max_count", -1);
+            JSONArray playerRows = row.optJSONArray("players");
+            if (sampledAt.isEmpty() || onlineCount < 0 || maxCount < 0
+                    || (maxCount > 0 && onlineCount > maxCount)
+                    || playerRows == null || playerRows.length() > 100) {
+                throw new IOException("История сервера содержит некорректную запись.");
+            }
+            List<String> players = new ArrayList<>();
+            for (int playerIndex = 0; playerIndex < playerRows.length(); playerIndex++) {
+                String player = playerRows.optString(playerIndex, "").trim();
+                if (!player.isEmpty() && player.length() <= 64) {
+                    players.add(player);
+                }
+            }
+            result.add(new CatalogHistorySample(
+                    sampledAt, onlineCount, maxCount, players));
+        }
+        return result;
+    }
+
+    public static boolean voteForCatalogServer(AccountSession session, long serverId)
+            throws IOException, JSONException {
+        if (session == null || serverId <= 0) {
+            throw new IllegalArgumentException("Войди в аккаунт, чтобы голосовать.");
+        }
+        JSONObject body = new JSONObject();
+        body.put("server_id", serverId);
+        String raw = requestWithSession(
+                "/rest/v1/rpc/vote_for_catalog_server",
+                "POST",
+                body,
+                session,
+                null).trim();
+        if ("true".equals(raw)) {
+            return true;
+        }
+        if ("false".equals(raw)) {
+            return false;
+        }
+        throw new IOException("Голосование вернуло неверный ответ.");
     }
 
     public static synchronized int synchronizeServers(
@@ -561,6 +833,29 @@ public final class CloudSyncClient {
         return username.trim().toLowerCase(Locale.ROOT) + "@users.mcmonitor.invalid";
     }
 
+    public static String validateEmail(String email) {
+        String clean = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+        if (clean.length() > 254
+                || !clean.matches("^[^@\\s]{1,64}@[^@\\s.]+(?:\\.[^@\\s.]+)+$")) {
+            throw new IllegalArgumentException("Укажи корректный адрес электронной почты.");
+        }
+        return clean;
+    }
+
+    public static String validateLoginIdentifier(String identifier, String password) {
+        String value = identifier == null ? "" : identifier.trim();
+        if (value.indexOf('@') >= 0) {
+            value = validateEmail(value);
+        } else if (!value.matches("[A-Za-z0-9_]{3,16}")) {
+            throw new IllegalArgumentException(
+                    "Введи корректный никнейм или адрес электронной почты.");
+        }
+        if (password == null || password.length() < 8) {
+            throw new IllegalArgumentException("Пароль должен содержать минимум 8 символов.");
+        }
+        return value;
+    }
+
     public static void validateCredentials(String username, String password) {
         String value = username == null ? "" : username.trim();
         if (!value.matches("[A-Za-z0-9_]{3,16}")) {
@@ -743,8 +1038,7 @@ public final class CloudSyncClient {
         String refresh = response.optString("refresh_token", "");
         JSONObject user = response.optJSONObject("user");
         if (access.isEmpty() || refresh.isEmpty() || user == null) {
-            throw new IOException(
-                    "В Supabase отключи подтверждение email: Authentication → Providers → Email.");
+            throw new IOException("Supabase не вернул сессию. Проверь подтверждение email и OTP.");
         }
         JSONObject metadata = user.optJSONObject("user_metadata");
         String username = metadata == null
@@ -955,6 +1249,60 @@ public final class CloudSyncClient {
             this.name = name;
             this.address = address;
             this.protocol = protocol;
+        }
+    }
+
+    public static final class CatalogServer {
+        public final long id;
+        public final String name;
+        public final String address;
+        public final String protocol;
+        public final int votes;
+        public final int subscribers;
+        public final int onlineCount;
+        public final boolean hasVotedToday;
+        public final String version;
+        public final String motd;
+        public final String favicon;
+
+        private CatalogServer(
+                long id,
+                String name,
+                String address,
+                String protocol,
+                int votes,
+                int subscribers,
+                int onlineCount,
+                boolean hasVotedToday,
+                String version,
+                String motd,
+                String favicon) {
+            this.id = id;
+            this.name = name;
+            this.address = address;
+            this.protocol = protocol;
+            this.votes = votes;
+            this.subscribers = subscribers;
+            this.onlineCount = onlineCount;
+            this.hasVotedToday = hasVotedToday;
+            this.version = version;
+            this.motd = motd;
+            this.favicon = favicon;
+        }
+    }
+
+    public static final class CatalogHistorySample {
+        public final String sampledAt;
+        public final int onlineCount;
+        public final int maxCount;
+        public final List<String> players;
+
+        private CatalogHistorySample(
+                String sampledAt, int onlineCount, int maxCount, List<String> players) {
+            this.sampledAt = sampledAt;
+            this.onlineCount = onlineCount;
+            this.maxCount = maxCount;
+            this.players = players;
         }
     }
 

@@ -53,6 +53,8 @@ public class ProfileActivity extends Activity {
     private CheckBox shareFriends;
     private CheckBox shareSubscriptions;
     private Button followButton;
+    private Button editProfileButton;
+    private LinearLayout editPanel;
     private LinearLayout results;
 
     @Override
@@ -148,6 +150,12 @@ public class ProfileActivity extends Activity {
         counts.setPadding(0, dp(16), 0, dp(12));
         page.addView(counts);
 
+        editProfileButton = new Button(this);
+        editProfileButton.setText("Редактировать профиль");
+        editProfileButton.setVisibility(ownProfile ? View.VISIBLE : View.GONE);
+        editProfileButton.setOnClickListener(view -> toggleEditor());
+        page.addView(editProfileButton, matchWrap());
+
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         HorizontalScrollView tabsScroll = new HorizontalScrollView(this);
@@ -179,10 +187,13 @@ public class ProfileActivity extends Activity {
         page.addView(followButton, matchWrap());
 
         if (ownProfile) {
-            addDivider(page);
+            editPanel = new LinearLayout(this);
+            editPanel.setOrientation(LinearLayout.VERTICAL);
+            editPanel.setVisibility(View.GONE);
+            addDivider(editPanel);
             TextView editHeading = sectionText();
             editHeading.setText("Редактирование и приватность");
-            page.addView(editHeading);
+            editPanel.addView(editHeading);
 
             Button chooseAvatar = new Button(this);
             chooseAvatar.setText("Изменить аватар");
@@ -193,36 +204,47 @@ public class ProfileActivity extends Activity {
                 intent.addCategory(android.content.Intent.CATEGORY_OPENABLE);
                 startActivityForResult(intent, REQUEST_AVATAR);
             });
-            page.addView(chooseAvatar, matchWrap());
+            editPanel.addView(chooseAvatar, matchWrap());
 
             displayNameInput = new EditText(this);
             displayNameInput.setSingleLine(true);
             displayNameInput.setHint("Отображаемое имя");
-            page.addView(displayNameInput, matchWrap());
+            editPanel.addView(displayNameInput, matchWrap());
             bioInput = new EditText(this);
             bioInput.setHint("О себе");
             bioInput.setMinLines(2);
             bioInput.setMaxLines(4);
-            page.addView(bioInput, matchWrap());
+            editPanel.addView(bioInput, matchWrap());
 
             shareServers = privacyCheckBox("Показывать мои серверы");
             shareFollowers = privacyCheckBox("Показывать подписчиков");
             shareFriends = privacyCheckBox("Показывать друзей");
             shareSubscriptions = privacyCheckBox("Показывать подписки на пользователей");
-            page.addView(shareServers);
-            page.addView(shareFollowers);
-            page.addView(shareFriends);
-            page.addView(shareSubscriptions);
+            editPanel.addView(shareServers);
+            editPanel.addView(shareFollowers);
+            editPanel.addView(shareFriends);
+            editPanel.addView(shareSubscriptions);
 
             Button save = new Button(this);
             save.setText("Сохранить профиль");
             save.setOnClickListener(view -> saveProfile());
-            page.addView(save, matchWrap());
+            editPanel.addView(save, matchWrap());
+            page.addView(editPanel, matchWrap());
         }
 
         status = sectionText();
         status.setTextColor(getColor(R.color.dim));
         page.addView(status);
+    }
+
+    private void toggleEditor() {
+        if (editPanel == null) {
+            return;
+        }
+        boolean opening = editPanel.getVisibility() != View.VISIBLE;
+        editPanel.setVisibility(opening ? View.VISIBLE : View.GONE);
+        editProfileButton.setText(
+                opening ? "Скрыть редактирование" : "Редактировать профиль");
     }
 
     private void applyWindowInsets(View root, LinearLayout content) {
@@ -282,7 +304,11 @@ public class ProfileActivity extends Activity {
             Bitmap bitmap = BitmapFactory.decodeByteArray(image, 0, image.length);
             if (bitmap != null) {
                 avatar.setImageBitmap(bitmap);
+            } else {
+                avatar.setImageResource(R.drawable.ic_profile);
             }
+        } else {
+            avatar.setImageResource(R.drawable.ic_profile);
         }
         counts.setText(
                 (summary.canViewFollowers
@@ -361,20 +387,74 @@ public class ProfileActivity extends Activity {
             return;
         }
         for (CloudSyncClient.PublicProfile person : people) {
-            TextView row = sectionText();
-            row.setText((person.displayName.isEmpty()
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(12), dp(10), dp(12), dp(10));
+            row.setBackground(cardBackground());
+
+            ImageView personAvatar = new ImageView(this);
+            personAvatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            personAvatar.setBackground(avatarBackground());
+            personAvatar.setClipToOutline(true);
+            personAvatar.setImageResource(R.drawable.ic_profile);
+            personAvatar.setTag(person.userId);
+            row.addView(personAvatar, new LinearLayout.LayoutParams(dp(42), dp(42)));
+
+            TextView personName = sectionText();
+            personName.setText((person.displayName.isEmpty()
                     ? "@" + person.username
                     : person.displayName + "  @" + person.username)
                     + ("friends".equals(relationship) ? "  ·  Друг" : ""));
-            row.setPadding(dp(10), dp(10), dp(10), dp(10));
+            personName.setMaxLines(2);
+            LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            nameParams.leftMargin = dp(12);
+            row.addView(personName, nameParams);
+            Button open = new Button(this);
+            open.setText("Открыть");
+            open.setOnClickListener(view -> openPersonProfile(person));
+            row.addView(open, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dp(42)));
             row.setOnClickListener(view -> {
-                android.content.Intent intent = new android.content.Intent(
-                        this, ProfileActivity.class);
-                intent.putExtra(EXTRA_PROFILE_ID, person.userId);
-                startActivity(intent);
+                openPersonProfile(person);
             });
             results.addView(row, matchWrap());
+            loadPersonAvatar(personAvatar, person);
         }
+    }
+
+    private void openPersonProfile(CloudSyncClient.PublicProfile person) {
+        android.content.Intent intent = new android.content.Intent(
+                this, ProfileActivity.class);
+        intent.putExtra(EXTRA_PROFILE_ID, person.userId);
+        startActivity(intent);
+    }
+
+    private void loadPersonAvatar(
+            ImageView imageView, CloudSyncClient.PublicProfile person) {
+        if (person.avatarPath == null) {
+            return;
+        }
+        executor.execute(() -> {
+            try {
+                byte[] data = CloudSyncClient.downloadAvatar(person);
+                if (data == null) {
+                    return;
+                }
+                Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
+                if (bitmap == null) {
+                    throw new IOException("Изображение аватара повреждено.");
+                }
+                runOnUiThread(() -> {
+                    if (!isFinishing() && person.userId.equals(imageView.getTag())) {
+                        imageView.setImageBitmap(bitmap);
+                    }
+                });
+            } catch (IOException exception) {
+                android.util.Log.w(
+                        "MCMonitorProfile", "Unable to load a relationship avatar", exception);
+            }
+        });
     }
 
     private void renderServers(List<CloudSyncClient.PublicServer> servers) {
@@ -421,6 +501,10 @@ public class ProfileActivity extends Activity {
                 AccountSessionStore.save(getApplicationContext(), session);
                 runOnUiThread(() -> {
                     pendingAvatar = null;
+                    if (editPanel != null) {
+                        editPanel.setVisibility(View.GONE);
+                        editProfileButton.setText("Редактировать профиль");
+                    }
                     loadProfile();
                     Toast.makeText(this, "Профиль сохранён.", Toast.LENGTH_SHORT).show();
                 });
@@ -545,11 +629,28 @@ public class ProfileActivity extends Activity {
     }
 
     private GradientDrawable avatarBackground() {
+        int accent = getSharedPreferences("app_settings", MODE_PRIVATE)
+                .getInt("accent_color", getColor(R.color.mint));
         GradientDrawable background = new GradientDrawable();
         background.setShape(GradientDrawable.OVAL);
-        background.setColor(Color.argb(50, 126, 224, 163));
-        background.setStroke(dp(1), Color.argb(100, 126, 224, 163));
+        background.setColor(withAlpha(accent, 50));
+        background.setStroke(dp(1), withAlpha(accent, 150));
         return background;
+    }
+
+    private GradientDrawable cardBackground() {
+        int accent = getSharedPreferences("app_settings", MODE_PRIVATE)
+                .getInt("accent_color", getColor(R.color.mint));
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(getColor(R.color.bg_bottom));
+        background.setCornerRadius(dp(16));
+        background.setStroke(dp(1), withAlpha(accent, 70));
+        return background;
+    }
+
+    private int withAlpha(int color, int alpha) {
+        return Color.argb(
+                alpha, Color.red(color), Color.green(color), Color.blue(color));
     }
 
     private LinearLayout.LayoutParams matchWrap() {

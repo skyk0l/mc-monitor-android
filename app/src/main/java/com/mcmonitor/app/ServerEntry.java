@@ -25,6 +25,9 @@ public class ServerEntry {
     public String protocol;
     public String groupId;
     public boolean showInWidget;
+    public boolean pinned;
+    public long addedAt;
+    public int sortOrder;
     public List<String> priorityPlayers;
 
     public ServerEntry() {
@@ -34,6 +37,7 @@ public class ServerEntry {
         autoName = "";
         protocol = PROTOCOL_JAVA;
         groupId = "";
+        addedAt = System.currentTimeMillis();
         priorityPlayers = new ArrayList<>();
     }
 
@@ -112,6 +116,9 @@ public class ServerEntry {
         json.put("protocol", normalizeProtocol(protocol));
         json.put("group_id", groupId == null ? "" : groupId);
         json.put("show_in_widget", showInWidget);
+        json.put("pinned", pinned);
+        json.put("added_at", addedAt);
+        json.put("sort_order", sortOrder);
         JSONArray priorities = new JSONArray();
         if (priorityPlayers != null) {
             for (String player : priorityPlayers) {
@@ -136,6 +143,9 @@ public class ServerEntry {
         entry.protocol = normalizeProtocol(json.optString("protocol", PROTOCOL_JAVA));
         entry.groupId = json.optString("group_id", "");
         entry.showInWidget = json.optBoolean("show_in_widget", false);
+        entry.pinned = json.optBoolean("pinned", false);
+        entry.addedAt = json.optLong("added_at", entry.addedAt);
+        entry.sortOrder = json.optInt("sort_order", 0);
         JSONArray priorities = json.optJSONArray("priority_players");
         if (priorities != null) {
             for (int i = 0; i < priorities.length(); i++) {

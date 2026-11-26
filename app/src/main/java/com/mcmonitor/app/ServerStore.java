@@ -26,11 +26,19 @@ public final class ServerStore {
         }
         try {
             JSONArray array = new JSONArray(raw);
+            boolean needsMigration = false;
             for (int i = 0; i < array.length(); i++) {
-                ServerEntry entry = ServerEntry.fromJson(array.optJSONObject(i));
+                JSONObject serverJson = array.optJSONObject(i);
+                if (serverJson != null && !serverJson.has("added_at")) {
+                    needsMigration = true;
+                }
+                ServerEntry entry = ServerEntry.fromJson(serverJson);
                 if (entry != null) {
                     entries.add(entry);
                 }
+            }
+            if (needsMigration) {
+                save(context, entries);
             }
         } catch (Exception ignored) {
         }

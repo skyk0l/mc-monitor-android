@@ -5,6 +5,8 @@ import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
+import android.content.ClipData;
+import android.content.ClipDescription;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -26,6 +28,7 @@ import android.util.Base64;
 import android.util.LruCache;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
@@ -52,6 +55,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Comparator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -93,8 +97,13 @@ public class MainActivity extends Activity {
 
     private final Map<String, View> cardViews = new java.util.HashMap<>();
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
+    private final ExecutorService catalogExecutor = Executors.newSingleThreadExecutor();
+    private final Map<String, Long> catalogStatusReportAt = new java.util.HashMap<>();
     private final java.util.Set<String> inFlightAddresses =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final java.util.Set<String> refreshAfterInFlight =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Object refreshLock = new Object();
     private final java.util.Set<String> accountAvatarRequests =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
@@ -114,6 +123,13 @@ public class MainActivity extends Activity {
     private LinearLayout communityResults;
     private int communityMode;
     private int communityRequestId;
+    private AlertDialog catalogDialog;
+    private EditText catalogSearch;
+    private LinearLayout catalogResults;
+    private TextView catalogStatus;
+    private Spinner catalogSort;
+    private int catalogRequestId;
+    private Runnable catalogSearchRunnable;
     private final LruCache<String, Bitmap> iconCache = new LruCache<String, Bitmap>(6 * 1024 * 1024) {
         @Override
         protected int sizeOf(String key, Bitmap value) {
@@ -124,7 +140,7 @@ public class MainActivity extends Activity {
     private final Runnable autoRefresh = new Runnable() {
         @Override
         public void run() {
-            refreshAll();
+            refreshAll(false);
             handler.postDelayed(this, REFRESH_INTERVAL);
         }
     };
@@ -155,6 +171,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.searchToggle).setOnClickListener(this::toggleSearch);
         findViewById(R.id.settingsButton).setOnClickListener(v ->
                 startActivity(new Intent(this, SettingsActivity.class)));
+        findViewById(R.id.topServersButton).setOnClickListener(v -> showCatalogDialog());
         searchInput.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence value, int start, int count, int after) {
@@ -185,7 +202,7 @@ public class MainActivity extends Activity {
         View refresh = findViewById(R.id.refresh);
         refresh.setOnClickListener(v -> {
             v.animate().rotationBy(360f).setDuration(520).start();
-            refreshAll();
+            refreshAll(true);
         });
 
         findViewById(R.id.addButton).setOnClickListener(v -> showServerDialog(null));
@@ -236,7 +253,7 @@ public class MainActivity extends Activity {
         updateAccountButton();
         ensurePriorityNotificationPermission();
         WidgetJobService.schedule(this);
-        refreshAll();
+        refreshAll(true);
         requestCloudSync(true);
         handler.removeCallbacks(autoRefresh);
         handler.postDelayed(autoRefresh, REFRESH_INTERVAL);
@@ -308,6 +325,7 @@ public class MainActivity extends Activity {
         cardViews.clear();
         serverList.removeAllViews();
         List<ServerEntry> entries = ServerStore.load(this);
+        sortServers(entries);
         String query = searchInput == null
                 ? ""
                 : searchInput.getText().toString().trim().toLowerCase(Locale.ROOT);
@@ -369,6 +387,43 @@ public class MainActivity extends Activity {
         return false;
     }
 
+    private void sortServers(List<ServerEntry> entries) {
+        String mode = getSharedPreferences(APP_SETTINGS, MODE_PRIVATE)
+                .getString("server_sort_mode", "manual");
+        Comparator<ServerEntry> comparator = (first, second) -> {
+            int pinnedOrder = Boolean.compare(second.pinned, first.pinned);
+            if (pinnedOrder != 0) {
+                return pinnedOrder;
+            }
+            if ("name".equals(mode)) {
+                return first.displayName().compareToIgnoreCase(second.displayName());
+            }
+            if ("date".equals(mode)) {
+                return Long.compare(second.addedAt, first.addedAt);
+            }
+            if ("online".equals(mode)) {
+                ServerStatus firstStatus = StatusCache.load(this, first.address);
+                ServerStatus secondStatus = StatusCache.load(this, second.address);
+                boolean firstOnline = firstStatus != null && firstStatus.hasData
+                        && firstStatus.online;
+                boolean secondOnline = secondStatus != null && secondStatus.hasData
+                        && secondStatus.online;
+                int onlineOrder = Boolean.compare(secondOnline, firstOnline);
+                if (onlineOrder != 0) {
+                    return onlineOrder;
+                }
+                int countOrder = Integer.compare(
+                        secondOnline ? secondStatus.onlineCount : 0,
+                        firstOnline ? firstStatus.onlineCount : 0);
+                if (countOrder != 0) {
+                    return countOrder;
+                }
+            }
+            return 0;
+        };
+        entries.sort(comparator);
+    }
+
     private void updateServerSummary(List<ServerEntry> entries) {
         int online = 0;
         for (ServerEntry entry : entries) {
@@ -381,11 +436,509 @@ public class MainActivity extends Activity {
                 + " · " + online + " онлайн");
     }
 
+    private void showCatalogDialog() {
+        if (catalogDialog != null) {
+            catalogDialog.show();
+            catalogDialog.getWindow().setLayout(
+                    (int) (getResources().getDisplayMetrics().widthPixels * 0.94),
+                    (int) (getResources().getDisplayMetrics().heightPixels * 0.82));
+            return;
+        }
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(18), dp(12), dp(18), dp(8));
+
+        catalogSearch = new EditText(this);
+        catalogSearch.setSingleLine(true);
+        catalogSearch.setHint(R.string.catalog_search_hint);
+        catalogSearch.setTextColor(getColor(R.color.text));
+        catalogSearch.setHintTextColor(getColor(R.color.dim));
+        root.addView(catalogSearch, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
+
+        catalogSort = new Spinner(this);
+        catalogSort.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                new String[]{
+                        getString(R.string.catalog_sort_votes),
+                        getString(R.string.catalog_sort_subscribers),
+                        getString(R.string.catalog_sort_online),
+                        getString(R.string.catalog_sort_newest)}));
+        root.addView(catalogSort, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
+
+        catalogStatus = new TextView(this);
+        catalogStatus.setText(R.string.catalog_loading);
+        catalogStatus.setTextColor(getColor(R.color.dim));
+        root.addView(catalogStatus);
+
+        catalogResults = new LinearLayout(this);
+        catalogResults.setOrientation(LinearLayout.VERTICAL);
+        ScrollView resultScroll = new ScrollView(this);
+        resultScroll.setFillViewport(true);
+        resultScroll.addView(catalogResults);
+        root.addView(resultScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(220)));
+
+        catalogDialog = new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle(R.string.catalog_title)
+                .setView(root)
+                .setPositiveButton(R.string.catalog_add_server, null)
+                .setNegativeButton(R.string.catalog_close, null)
+                .create();
+        catalogDialog.setOnShowListener(ignored -> {
+            catalogDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(
+                    getColor(R.color.mint));
+            catalogDialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(
+                    getColor(R.color.soft));
+            catalogDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v ->
+                    showAddCatalogServerDialog());
+        });
+        catalogDialog.setOnDismissListener(ignored -> {
+            if (catalogSearchRunnable != null) {
+                handler.removeCallbacks(catalogSearchRunnable);
+                catalogSearchRunnable = null;
+            }
+            catalogRequestId++;
+            catalogDialog = null;
+            catalogSearch = null;
+            catalogResults = null;
+            catalogStatus = null;
+            catalogSort = null;
+        });
+        catalogSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence value, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence value, int start, int before, int count) {
+                scheduleCatalogSearch();
+            }
+
+            @Override
+            public void afterTextChanged(Editable value) {
+            }
+        });
+        catalogSort.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(
+                    android.widget.AdapterView<?> parent, View view, int position, long id) {
+                scheduleCatalogSearch();
+            }
+
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {
+            }
+        });
+        catalogDialog.show();
+        catalogDialog.getWindow().setLayout(
+                (int) (getResources().getDisplayMetrics().widthPixels * 0.94),
+                (int) (getResources().getDisplayMetrics().heightPixels * 0.82));
+        scheduleCatalogSearch();
+    }
+
+    private void scheduleCatalogSearch() {
+        if (catalogSearch == null || catalogDialog == null) {
+            return;
+        }
+        if (catalogSearchRunnable != null) {
+            handler.removeCallbacks(catalogSearchRunnable);
+        }
+        int requestId = ++catalogRequestId;
+        String query = catalogSearch.getText().toString().trim();
+        int selectedSort = catalogSort.getSelectedItemPosition();
+        String sort = selectedSort == 1 ? "subscribers"
+                : selectedSort == 2 ? "online"
+                : selectedSort == 3 ? "newest" : "votes";
+        catalogStatus.setText(R.string.catalog_loading);
+        catalogSearchRunnable = () -> loadCatalog(query, sort, requestId);
+        handler.postDelayed(catalogSearchRunnable, 250);
+    }
+
+    private void loadCatalog(String query, String sort, int requestId) {
+        AccountSession session = AccountSessionStore.load(this);
+        executor.execute(() -> {
+            try {
+                List<CloudSyncClient.CatalogServer> servers =
+                        CloudSyncClient.listServerCatalog(query, sort, 50, session);
+                handler.post(() -> {
+                    if (catalogDialog == null || requestId != catalogRequestId) {
+                        return;
+                    }
+                    renderCatalogServers(servers, session);
+                });
+            } catch (Exception exception) {
+                handler.post(() -> {
+                    if (catalogDialog != null && requestId == catalogRequestId) {
+                        catalogStatus.setText(catalogErrorMessage(exception));
+                    }
+                });
+            }
+        });
+    }
+
+    private void renderCatalogServers(
+            List<CloudSyncClient.CatalogServer> servers, AccountSession session) {
+        if (catalogResults == null) {
+            return;
+        }
+        catalogResults.removeAllViews();
+        catalogStatus.setText(servers.isEmpty()
+                ? getString(R.string.catalog_empty)
+                : getString(R.string.catalog_count, servers.size()));
+        for (CloudSyncClient.CatalogServer server : servers) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(dp(12), dp(10), dp(12), dp(10));
+            GradientDrawable background = new GradientDrawable();
+            background.setColor(getColor(R.color.bg_bottom));
+            background.setCornerRadius(dp(14));
+            int accent = getSharedPreferences(APP_SETTINGS, MODE_PRIVATE)
+                    .getInt("accent_color", getColor(R.color.mint));
+            background.setStroke(dp(1), accent);
+            row.setBackground(background);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            rowParams.bottomMargin = dp(8);
+            catalogResults.addView(row, rowParams);
+
+            LinearLayout header = new LinearLayout(this);
+            header.setGravity(Gravity.CENTER_VERTICAL);
+            ImageView icon = new ImageView(this);
+            Bitmap favicon = decodeIcon(server.favicon);
+            icon.setImageBitmap(favicon);
+            if (favicon == null) {
+                icon.setImageResource(R.drawable.ic_server_fallback);
+            }
+            header.addView(icon, new LinearLayout.LayoutParams(dp(34), dp(34)));
+            TextView title = new TextView(this);
+            title.setText(server.name.isEmpty() ? server.address : server.name);
+            title.setTextColor(getColor(R.color.text));
+            title.setTextSize(15);
+            title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+            titleParams.leftMargin = dp(8);
+            header.addView(title, titleParams);
+            row.addView(header);
+
+            TextView detail = new TextView(this);
+            detail.setText(getString(
+                    R.string.catalog_server_detail,
+                    server.address,
+                    server.protocol.toUpperCase(Locale.ROOT),
+                    server.onlineCount < 0 ? "—" : String.valueOf(server.onlineCount),
+                    server.votes,
+                    server.subscribers));
+            detail.setTextColor(getColor(R.color.soft));
+            detail.setTextSize(12);
+            row.addView(detail);
+            if (!server.version.isEmpty()) {
+                TextView version = new TextView(this);
+                version.setText(getString(R.string.catalog_server_version, server.version));
+                version.setTextColor(getColor(R.color.dim));
+                version.setTextSize(11);
+                row.addView(version);
+            }
+            if (!server.motd.isEmpty()) {
+                TextView motd = new TextView(this);
+                motd.setText(server.motd);
+                motd.setTextColor(getColor(R.color.soft));
+                motd.setTextSize(12);
+                motd.setMaxLines(2);
+                row.addView(motd);
+            }
+
+            LinearLayout actions = new LinearLayout(this);
+            actions.setOrientation(LinearLayout.HORIZONTAL);
+            Button addToMine = new Button(this);
+            addToMine.setText(R.string.catalog_add_to_mine);
+            addToMine.setOnClickListener(v -> addCatalogServerToMine(server));
+            addToMine.setTextSize(11);
+            addToMine.setMinWidth(0);
+            actions.addView(addToMine, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            Button details = new Button(this);
+            details.setText(R.string.catalog_server_about);
+            details.setOnClickListener(v -> showCatalogServerDetails(server));
+            details.setTextSize(11);
+            details.setMinWidth(0);
+            actions.addView(details, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            Button vote = new Button(this);
+            vote.setText(server.hasVotedToday
+                    ? getString(R.string.catalog_vote_counted)
+                    : getString(R.string.catalog_vote));
+            vote.setEnabled(!server.hasVotedToday);
+            vote.setOnClickListener(v -> voteForCatalogServer(server, session));
+            vote.setTextSize(11);
+            vote.setMinWidth(0);
+            actions.addView(vote, new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            row.addView(actions);
+        }
+    }
+
+    private void showCatalogServerDetails(CloudSyncClient.CatalogServer server) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(18), dp(12), dp(18), dp(8));
+
+        TextView summary = new TextView(this);
+        summary.setText(getString(
+                R.string.catalog_history_summary,
+                server.address,
+                server.protocol.toUpperCase(Locale.ROOT),
+                server.votes,
+                server.subscribers));
+        summary.setTextColor(getColor(R.color.soft));
+        content.addView(summary);
+        if (!server.version.isEmpty()) {
+            TextView version = new TextView(this);
+            version.setText(getString(R.string.catalog_server_version, server.version));
+            version.setTextColor(getColor(R.color.dim));
+            content.addView(version);
+        }
+        if (!server.motd.isEmpty()) {
+            TextView motd = new TextView(this);
+            motd.setText(server.motd);
+            motd.setTextColor(getColor(R.color.soft));
+            motd.setMaxLines(3);
+            content.addView(motd);
+        }
+
+        TextView status = new TextView(this);
+        status.setText(R.string.catalog_history_loading);
+        status.setTextColor(getColor(R.color.dim));
+        content.addView(status);
+
+        int accent = getSharedPreferences(APP_SETTINGS, MODE_PRIVATE)
+                .getInt("accent_color", getColor(R.color.mint));
+        CatalogHistoryChartView chart = new CatalogHistoryChartView(this, accent);
+        content.addView(chart, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(190)));
+
+        TextView selectedSample = new TextView(this);
+        selectedSample.setTextColor(getColor(R.color.text));
+        selectedSample.setTextSize(13);
+        selectedSample.setPadding(0, dp(8), 0, dp(4));
+        content.addView(selectedSample);
+        chart.setOnSampleSelectedListener(sample -> {
+            String players = sample.players.isEmpty()
+                    ? getString(R.string.catalog_history_no_players)
+                    : android.text.TextUtils.join(", ", sample.players);
+            selectedSample.setText(getString(
+                    R.string.catalog_history_sample,
+                    sample.sampledAt,
+                    sample.onlineCount,
+                    sample.maxCount,
+                    players));
+        });
+
+        AlertDialog detailDialog = new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle(server.name.isEmpty() ? server.address : server.name)
+                .setView(content)
+                .setPositiveButton(R.string.catalog_close, null)
+                .create();
+        detailDialog.show();
+        detailDialog.getWindow().setLayout(
+                (int) (getResources().getDisplayMetrics().widthPixels * 0.94),
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+
+        AccountSession session = AccountSessionStore.load(this);
+        executor.execute(() -> {
+            try {
+                List<CloudSyncClient.CatalogHistorySample> samples =
+                        CloudSyncClient.listServerCatalogHistory(server.id, 300, session);
+                handler.post(() -> {
+                    if (!detailDialog.isShowing()) {
+                        return;
+                    }
+                    status.setText(samples.isEmpty()
+                            ? R.string.catalog_history_empty
+                            : R.string.catalog_history_range);
+                    chart.setSamples(samples);
+                });
+            } catch (Exception exception) {
+                handler.post(() -> {
+                    if (detailDialog.isShowing()) {
+                        status.setText(catalogErrorMessage(exception));
+                    }
+                });
+            }
+        });
+    }
+
+    private void addCatalogServerToMine(CloudSyncClient.CatalogServer server) {
+        List<ServerEntry> entries = ServerStore.load(this);
+        for (ServerEntry entry : entries) {
+            if (ServerEntry.normalize(entry.address)
+                    .equalsIgnoreCase(ServerEntry.normalize(server.address))) {
+                Toast.makeText(this, R.string.catalog_server_exists, Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
+        ServerEntry entry = new ServerEntry(server.address, server.name);
+        entry.protocol = ServerEntry.normalizeProtocol(server.protocol);
+        entries.add(entry);
+        ServerStore.save(this, entries);
+        buildCards();
+        requestCloudSync(true);
+        publishServerToCatalog(entry);
+        Toast.makeText(this, R.string.catalog_server_added, Toast.LENGTH_SHORT).show();
+    }
+
+    private void publishServerToCatalog(ServerEntry entry) {
+        executor.execute(() -> {
+            try {
+                CloudSyncClient.addServerToCatalog(
+                        entry.address, entry.displayName(), entry.protocol);
+            } catch (Exception exception) {
+                Log.w(TAG, "Не удалось добавить сервер в общий каталог", exception);
+                handler.post(() -> {
+                    if (!isFinishing() && !isDestroyed()) {
+                        Toast.makeText(this,
+                                getString(R.string.catalog_publish_failed,
+                                        catalogErrorMessage(exception)),
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        });
+    }
+
+    private void voteForCatalogServer(
+            CloudSyncClient.CatalogServer server, AccountSession session) {
+        if (session == null) {
+            Toast.makeText(this, R.string.catalog_need_login, Toast.LENGTH_LONG).show();
+            showAccountMenu();
+            return;
+        }
+        if (catalogStatus != null) {
+            catalogStatus.setText(R.string.catalog_vote_sent);
+        }
+        executor.execute(() -> {
+            try {
+                boolean inserted = CloudSyncClient.voteForCatalogServer(session, server.id);
+                handler.post(() -> {
+                    if (catalogDialog == null) {
+                        return;
+                    }
+                    Toast.makeText(this, inserted
+                                    ? R.string.catalog_vote_success
+                                    : R.string.catalog_vote_duplicate,
+                            Toast.LENGTH_SHORT).show();
+                    scheduleCatalogSearch();
+                });
+            } catch (Exception exception) {
+                handler.post(() -> {
+                    if (catalogStatus != null) {
+                        catalogStatus.setText(catalogErrorMessage(exception));
+                    }
+                });
+            }
+        });
+    }
+
+    private void showAddCatalogServerDialog() {
+        if (catalogDialog == null) {
+            return;
+        }
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(8), dp(20), 0);
+        EditText name = new EditText(this);
+        name.setSingleLine(true);
+        name.setHint(R.string.catalog_name_optional);
+        form.addView(name);
+        EditText address = new EditText(this);
+        address.setSingleLine(true);
+        address.setHint(R.string.catalog_address_hint);
+        address.setInputType(InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_VARIATION_URI);
+        form.addView(address);
+        Spinner protocol = new Spinner(this);
+        protocol.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item,
+                new String[]{
+                        getString(R.string.catalog_java),
+                        getString(R.string.catalog_bedrock)}));
+        form.addView(protocol);
+        AlertDialog formDialog = new AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle(R.string.catalog_add_title)
+                .setView(form)
+                .setPositiveButton(R.string.catalog_add, null)
+                .setNegativeButton(R.string.catalog_cancel, null)
+                .create();
+        formDialog.setOnShowListener(ignored -> formDialog
+                .getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                    String serverAddress = address.getText().toString().trim();
+                    if (serverAddress.isEmpty()) {
+                        address.setError(getString(R.string.catalog_address_required));
+                        return;
+                    }
+                    formDialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+                    executor.execute(() -> {
+                        try {
+                            CloudSyncClient.addServerToCatalog(
+                                    serverAddress,
+                                    name.getText().toString(),
+                                    protocol.getSelectedItemPosition() == 1 ? "bedrock" : "java");
+                            handler.post(() -> {
+                                formDialog.dismiss();
+                                Toast.makeText(this, R.string.catalog_server_added_public,
+                                        Toast.LENGTH_SHORT).show();
+                                scheduleCatalogSearch();
+                            });
+                        } catch (Exception exception) {
+                            handler.post(() -> {
+                                formDialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                                        .setEnabled(true);
+                                address.setError(catalogErrorMessage(exception));
+                            });
+                        }
+                    });
+                }));
+        formDialog.show();
+    }
+
     private void bindCard(View card, ServerEntry entry) {
         TextView name = card.findViewById(R.id.serverName);
         TextView address = card.findViewById(R.id.serverAddress);
-        name.setText(entry.displayName());
+        name.setText((entry.pinned ? "📌 " : "") + entry.displayName());
         address.setText(entry.address);
+        name.setOnLongClickListener(v -> {
+            ClipData dragData = ClipData.newPlainText("server-id", entry.id);
+            return v.startDragAndDrop(
+                    dragData, new View.DragShadowBuilder(v), entry.id, 0);
+        });
+        card.setOnDragListener((view, event) -> {
+            if (event.getAction() == android.view.DragEvent.ACTION_DRAG_STARTED) {
+                return event.getClipDescription() != null
+                        && event.getClipDescription().hasMimeType(
+                                ClipDescription.MIMETYPE_TEXT_PLAIN);
+            }
+            if (event.getAction() == android.view.DragEvent.ACTION_DRAG_ENTERED) {
+                view.setAlpha(0.72f);
+                return true;
+            }
+            if (event.getAction() == android.view.DragEvent.ACTION_DRAG_EXITED
+                    || event.getAction() == android.view.DragEvent.ACTION_DRAG_ENDED) {
+                view.setAlpha(1f);
+                return true;
+            }
+            if (event.getAction() == android.view.DragEvent.ACTION_DROP) {
+                CharSequence draggedId = event.getClipData().getItemAt(0).getText();
+                if (draggedId != null) {
+                    reorderServers(draggedId.toString(), entry.id);
+                }
+                view.setAlpha(1f);
+                return true;
+            }
+            return true;
+        });
 
         View more = card.findViewById(R.id.moreButton);
         more.setOnClickListener(v -> showServerMenu(entry, v));
@@ -400,7 +953,7 @@ public class MainActivity extends Activity {
     private void renderCard(View card, ServerEntry entry, ServerStatus status, boolean loading) {
         TextView name = card.findViewById(R.id.serverName);
         if (name != null) {
-            name.setText(entry.displayName());
+            name.setText((entry.pinned ? "📌 " : "") + entry.displayName());
         }
 
         ImageView icon = card.findViewById(R.id.serverIcon);
@@ -1179,6 +1732,7 @@ public class MainActivity extends Activity {
             avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
             avatar.setBackground(avatarBackground());
             avatar.setClipToOutline(true);
+            avatar.setImageResource(R.drawable.ic_profile);
             avatar.setTag(profile.userId);
             identity.addView(avatar, new LinearLayout.LayoutParams(dp(40), dp(40)));
             TextView title = new TextView(this);
@@ -1345,6 +1899,7 @@ public class MainActivity extends Activity {
         ServerStore.save(this, servers);
         buildCards();
         requestCloudSync(true);
+        publishServerToCatalog(entry);
         Toast.makeText(this, "Сервер добавлен.", Toast.LENGTH_SHORT).show();
     }
 
@@ -1374,13 +1929,17 @@ public class MainActivity extends Activity {
     }
 
         private void showAccountForm(boolean register) {
+            if (register) {
+                showEmailSignupEmailForm();
+                return;
+            }
             LinearLayout form = new LinearLayout(this);
             form.setOrientation(LinearLayout.VERTICAL);
             int padding = dp(20);
             form.setPadding(padding, dp(8), padding, 0);
 
             TextView recoveryNote = new TextView(this);
-            recoveryNote.setText(R.string.account_recovery_note);
+            recoveryNote.setText(R.string.account_login_note);
             recoveryNote.setTextColor(getColor(R.color.dim));
             recoveryNote.setTextSize(12f);
             form.addView(recoveryNote, new LinearLayout.LayoutParams(
@@ -1388,7 +1947,7 @@ public class MainActivity extends Activity {
 
             EditText username = new EditText(this);
             username.setSingleLine(true);
-            username.setHint("Никнейм (3–16 символов)");
+            username.setHint(R.string.account_identifier_hint);
             username.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PERSON_NAME);
             form.addView(username, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -1401,10 +1960,10 @@ public class MainActivity extends Activity {
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
             AlertDialog dialog = new AlertDialog.Builder(this, R.style.DialogTheme)
-                    .setTitle(register ? "Создать аккаунт" : "Войти")
+                    .setTitle(R.string.account_login_title)
                     .setView(form)
-                    .setNegativeButton("Отмена", null)
-                    .setPositiveButton(register ? "Создать" : "Войти", null)
+                    .setNegativeButton(R.string.account_cancel, null)
+                    .setPositiveButton(R.string.account_sign_in, null)
                     .create();
             dialog.setOnShowListener(ignored -> {
                 Button submit = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
@@ -1414,16 +1973,162 @@ public class MainActivity extends Activity {
                     String nick = username.getText().toString().trim();
                     String pass = password.getText().toString();
                     try {
+                        CloudSyncClient.validateLoginIdentifier(nick, pass);
+                    } catch (IllegalArgumentException exception) {
+                        Toast.makeText(this, exception.getMessage(), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    dialog.dismiss();
+                    authenticate(false, nick, pass);
+                });
+            });
+            dialog.show();
+        }
+
+        private void showEmailSignupEmailForm() {
+            EditText email = new EditText(this);
+            email.setSingleLine(true);
+            email.setHint(R.string.account_email_hint);
+            email.setInputType(InputType.TYPE_CLASS_TEXT
+                    | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+            LinearLayout content = new LinearLayout(this);
+            content.setPadding(dp(20), dp(8), dp(20), 0);
+            content.addView(email, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+            AlertDialog dialog = new AlertDialog.Builder(this, R.style.DialogTheme)
+                    .setTitle(R.string.account_signup_title)
+                    .setMessage(R.string.account_signup_email_step)
+                    .setView(content)
+                    .setNegativeButton(R.string.account_cancel, null)
+                    .setPositiveButton(R.string.account_send_code, null)
+                    .create();
+            dialog.setOnShowListener(ignored -> {
+                Button submit = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                submit.setTextColor(getColor(R.color.mint));
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(getColor(R.color.soft));
+                submit.setOnClickListener(v -> {
+                    final String cleanEmail;
+                    try {
+                        cleanEmail = CloudSyncClient.validateEmail(
+                                email.getText().toString());
+                    } catch (IllegalArgumentException exception) {
+                        Toast.makeText(this, exception.getMessage(), Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    dialog.dismiss();
+                    requestEmailSignupCode(cleanEmail);
+                });
+            });
+            dialog.show();
+        }
+
+        private void requestEmailSignupCode(String email) {
+            accountButton.setEnabled(false);
+            syncExecutor.execute(() -> {
+                try {
+                    CloudSyncClient.requestEmailSignupCode(email);
+                    handler.post(() -> {
+                        accountButton.setEnabled(true);
+                        showEmailSignupCompletionForm(email);
+                    });
+                } catch (Exception exception) {
+                    Log.w(TAG, "Не удалось отправить код регистрации", exception);
+                    handler.post(() -> {
+                        accountButton.setEnabled(true);
+                        Toast.makeText(this, cloudErrorMessage(exception), Toast.LENGTH_LONG).show();
+                    });
+                }
+            });
+        }
+
+        private void showEmailSignupCompletionForm(String email) {
+            LinearLayout form = new LinearLayout(this);
+            form.setOrientation(LinearLayout.VERTICAL);
+            form.setPadding(dp(20), dp(8), dp(20), 0);
+            EditText code = new EditText(this);
+            code.setSingleLine(true);
+            code.setHint(R.string.account_code_hint);
+            code.setInputType(InputType.TYPE_CLASS_NUMBER);
+            form.addView(code);
+            EditText username = new EditText(this);
+            username.setSingleLine(true);
+            username.setHint(R.string.account_nickname_hint);
+            username.setInputType(InputType.TYPE_CLASS_TEXT
+                    | InputType.TYPE_TEXT_VARIATION_PERSON_NAME);
+            form.addView(username);
+            EditText password = new EditText(this);
+            password.setSingleLine(true);
+            password.setHint(R.string.account_password_hint);
+            password.setInputType(InputType.TYPE_CLASS_TEXT
+                    | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            form.addView(password);
+            EditText confirmPassword = new EditText(this);
+            confirmPassword.setSingleLine(true);
+            confirmPassword.setHint(R.string.account_confirm_password_hint);
+            confirmPassword.setInputType(InputType.TYPE_CLASS_TEXT
+                    | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            form.addView(confirmPassword);
+            AlertDialog dialog = new AlertDialog.Builder(this, R.style.DialogTheme)
+                    .setTitle(R.string.account_signup_title)
+                    .setMessage(getString(R.string.account_code_sent, email))
+                    .setView(form)
+                    .setNegativeButton(R.string.account_cancel, null)
+                    .setPositiveButton(R.string.account_create, null)
+                    .create();
+            dialog.setOnShowListener(ignored -> {
+                Button submit = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+                submit.setTextColor(getColor(R.color.mint));
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(getColor(R.color.soft));
+                submit.setOnClickListener(v -> {
+                    String nick = username.getText().toString().trim();
+                    String pass = password.getText().toString();
+                    if (!pass.equals(confirmPassword.getText().toString())) {
+                        Toast.makeText(this, R.string.account_password_mismatch,
+                                Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    try {
                         CloudSyncClient.validateCredentials(nick, pass);
                     } catch (IllegalArgumentException exception) {
                         Toast.makeText(this, exception.getMessage(), Toast.LENGTH_SHORT).show();
                         return;
                     }
                     dialog.dismiss();
-                    authenticate(register, nick, pass);
+                    completeEmailSignup(
+                            email, code.getText().toString().trim(), nick, pass);
                 });
             });
             dialog.show();
+        }
+
+        private void completeEmailSignup(
+                String email, String code, String username, String password) {
+            accountButton.setEnabled(false);
+            syncExecutor.execute(() -> {
+                try {
+                    AccountSession session = CloudSyncClient.completeEmailSignup(
+                            email, code, username, password);
+                    AccountSessionStore.save(getApplicationContext(), session);
+                    int serverCount = synchronizeWithCloud(session);
+                    handler.post(() -> {
+                        updateAccountButton();
+                        accountButton.setEnabled(true);
+                        buildCards();
+                        ensurePriorityNotificationPermission();
+                        Toast.makeText(this,
+                                getString(R.string.account_sync_result, serverCount),
+                                Toast.LENGTH_SHORT).show();
+                    });
+                } catch (Exception exception) {
+                    Log.e(TAG, "Ошибка регистрации аккаунта", exception);
+                    handler.post(() -> {
+                        updateAccountButton();
+                        accountButton.setEnabled(true);
+                        Toast.makeText(this, cloudErrorMessage(exception), Toast.LENGTH_LONG)
+                                .show();
+                    });
+                }
+            });
         }
 
         private void authenticate(boolean register, String username, String password) {
@@ -1544,22 +2249,41 @@ public class MainActivity extends Activity {
             }
             return message;
         }
-    private void refreshAll() {
+
+        private String catalogErrorMessage(Exception exception) {
+            String message = cloudErrorMessage(exception);
+            String normalized = message.toLowerCase(Locale.ROOT);
+            if (normalized.contains("could not find")
+                    && normalized.contains("function")
+                    && normalized.contains("server_catalog")) {
+                return getString(R.string.catalog_server_not_configured);
+            }
+            return message;
+        }
+    private void refreshAll(boolean force) {
         if (isFinishing() || isDestroyed()) {
             return;
         }
         List<ServerEntry> entries = ServerStore.load(this);
         for (ServerEntry entry : entries) {
-            fetch(entry);
+            fetch(entry, force);
         }
     }
 
-    private void fetch(ServerEntry entry) {
+    private void fetch(ServerEntry entry, boolean force) {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
         final String entryId = entry.id;
         final String address = entry.address;
         final String protocol = ServerEntry.normalizeProtocol(entry.protocol);
-        if (!inFlightAddresses.add(address)) {
-            return;
+        synchronized (refreshLock) {
+            if (!inFlightAddresses.add(address)) {
+                if (force) {
+                    refreshAfterInFlight.add(address);
+                }
+                return;
+            }
         }
 
         View card = cardViews.get(entryId);
@@ -1579,8 +2303,46 @@ public class MainActivity extends Activity {
                         status);
                 StatusCache.save(getApplicationContext(), status);
                 handler.post(() -> applyStatus(entryId, address, status));
+                queueCatalogStatus(address, status);
             } finally {
-                inFlightAddresses.remove(address);
+                boolean shouldRefresh;
+                synchronized (refreshLock) {
+                    inFlightAddresses.remove(address);
+                    shouldRefresh = refreshAfterInFlight.remove(address);
+                }
+                if (shouldRefresh) {
+                    handler.post(() -> {
+                        ServerEntry current = ServerStore.findByAddress(
+                                getApplicationContext(), address);
+                        if (current != null) {
+                            fetch(current, false);
+                        }
+                    });
+                }
+            }
+        });
+    }
+
+    private void queueCatalogStatus(String address, ServerStatus status) {
+        if (status == null || !status.hasData) {
+            return;
+        }
+        catalogExecutor.execute(() -> {
+            long now = System.currentTimeMillis();
+            Long previous = catalogStatusReportAt.get(address);
+            if (previous != null && now - previous < 60_000L) {
+                return;
+            }
+            catalogStatusReportAt.put(address, now);
+            try {
+                AccountSession session = AccountSessionStore.load(getApplicationContext());
+                if (session == null) {
+                    return;
+                }
+                CloudSyncClient.reportServerCatalogStatus(session, address, status);
+                AccountSessionStore.save(getApplicationContext(), session);
+            } catch (Exception exception) {
+                Log.w(TAG, "Не удалось отправить статус сервера в общий каталог", exception);
             }
         });
     }
@@ -1643,7 +2405,25 @@ public class MainActivity extends Activity {
         menu.getMenu().add(0, 5, 3,
                 entry.groupId == null || entry.groupId.isEmpty()
                         ? "Добавить в группу…" : "Группа: " + entry.groupId);
-        menu.getMenu().add(0, 3, 4, "Удалить");
+        menu.getMenu().add(0, 6, 4,
+                entry.pinned ? "Открепить сервер" : "Закрепить сервер");
+        boolean groupPinned = false;
+        if (entry.groupId != null && !entry.groupId.isEmpty()) {
+            List<ServerEntry> entries = ServerStore.load(this);
+            groupPinned = true;
+            boolean found = false;
+            for (ServerEntry candidate : entries) {
+                if (entry.groupId.equals(candidate.groupId)) {
+                    found = true;
+                    groupPinned &= candidate.pinned;
+                }
+            }
+            groupPinned &= found;
+            menu.getMenu().add(0, 7, 5,
+                    groupPinned ? "Открепить группу" : "Закрепить группу");
+        }
+        final boolean groupPinState = groupPinned;
+        menu.getMenu().add(0, 3, 6, "Удалить");
         menu.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == 1) {
                 showServerDialog(entry);
@@ -1665,9 +2445,66 @@ public class MainActivity extends Activity {
                 showGroupDialog(entry);
                 return true;
             }
+            if (item.getItemId() == 6) {
+                setPinned(entry, !entry.pinned, false);
+                return true;
+            }
+            if (item.getItemId() == 7) {
+                setPinned(entry, !groupPinState, true);
+                return true;
+            }
             return false;
         });
         menu.show();
+    }
+
+    private void setPinned(ServerEntry selected, boolean pinned, boolean group) {
+        List<ServerEntry> entries = ServerStore.load(this);
+        for (ServerEntry entry : entries) {
+            boolean matches = entry.id.equals(selected.id);
+            if (group && selected.groupId != null && !selected.groupId.isEmpty()) {
+                matches = selected.groupId.equals(entry.groupId);
+            }
+            if (matches) {
+                entry.pinned = pinned;
+            }
+        }
+        ServerStore.save(this, entries);
+        buildCards(false);
+        requestCloudSync(true);
+    }
+
+    private void reorderServers(String draggedId, String targetId) {
+        List<ServerEntry> entries = ServerStore.load(this);
+        int sourceIndex = -1;
+        int targetIndex = -1;
+        for (int i = 0; i < entries.size(); i++) {
+            if (entries.get(i).id.equals(draggedId)) {
+                sourceIndex = i;
+            }
+            if (entries.get(i).id.equals(targetId)) {
+                targetIndex = i;
+            }
+        }
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex == targetIndex) {
+            return;
+        }
+        ServerEntry target = entries.get(targetIndex);
+        ServerEntry moving = entries.remove(sourceIndex);
+        targetIndex = entries.indexOf(target);
+        if (targetIndex < 0) {
+            return;
+        }
+        entries.add(targetIndex, moving);
+        for (int i = 0; i < entries.size(); i++) {
+            entries.get(i).sortOrder = i;
+        }
+        getSharedPreferences(APP_SETTINGS, MODE_PRIVATE).edit()
+                .putString("server_sort_mode", "manual")
+                .apply();
+        ServerStore.save(this, entries);
+        buildCards(false);
+        requestCloudSync(true);
     }
 
     private void showPrioritiesDialog(ServerEntry entry) {
@@ -1949,9 +2786,10 @@ public class MainActivity extends Activity {
                     entries.add(created);
                     ServerStore.save(this, entries);
                     requestCloudSync(true);
+                    publishServerToCatalog(created);
                     dialog.dismiss();
                     buildCards();
-                    fetch(created);
+                    fetch(created, true);
                     scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
                 } else {
                     String oldAddress = entry.address;
@@ -1962,6 +2800,7 @@ public class MainActivity extends Activity {
                     ServerStore.saveEntry(this, entry);
                     requestCloudSync(true);
                     if (!oldAddress.equals(address)) {
+                        publishServerToCatalog(entry);
                         if (!ServerStore.isAddressTaken(this, oldAddress, entry.id)) {
                             StatusCache.clear(this, oldAddress);
                         }
@@ -1969,7 +2808,7 @@ public class MainActivity extends Activity {
                     }
                     dialog.dismiss();
                     buildCards();
-                    fetch(entry);
+                    fetch(entry, true);
                 }
             });
         });
@@ -2005,19 +2844,32 @@ public class MainActivity extends Activity {
     }
 
     private void showWidgetPicker(ServerEntry entry) {
-        String[] items = {
-                "2 × 2 · компактный",
-                "2 × 1 · мини-виджет",
-                "3 × 3 · со списком игроков",
-        };
+        List<String> options = new java.util.ArrayList<>();
+        options.add("2 × 2 · компактный");
+        options.add("2 × 1 · мини-виджет");
+        options.add("3 × 3 · со списком игроков");
+        boolean hasGroup = entry.groupId != null && !entry.groupId.trim().isEmpty();
+        if (hasGroup) {
+            options.add(getString(R.string.widget_group_add, entry.groupId));
+        }
         new AlertDialog.Builder(this, R.style.DialogTheme)
                 .setTitle("Виджет для «" + entry.displayName() + "»")
-                .setItems(items, (dialog, which) -> pinWidget(entry, which))
+                .setItems(options.toArray(new String[0]), (dialog, which) -> {
+                    if (hasGroup && which == options.size() - 1) {
+                        pinWidget(entry, WidgetStore.KIND_GROUP, entry.groupId);
+                    } else {
+                        pinWidget(entry, which);
+                    }
+                })
                 .setNegativeButton("Отмена", null)
                 .show();
     }
 
     private void pinWidget(ServerEntry entry, int kind) {
+        pinWidget(entry, kind, "");
+    }
+
+    private void pinWidget(ServerEntry entry, int kind, String groupId) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             showWidgetFallback();
             return;
@@ -2036,7 +2888,8 @@ public class MainActivity extends Activity {
                 .setData(Uri.parse(
                         "mcmonitor://pin-result/" + kind + "/" + Uri.encode(entry.address)))
                 .putExtra("kind", kind)
-                .putExtra("address", entry.address);
+                .putExtra("address", entry.address)
+                .putExtra("group_id", groupId);
         int pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             pendingFlags |= PendingIntent.FLAG_MUTABLE;
@@ -2047,6 +2900,7 @@ public class MainActivity extends Activity {
         Bundle extras = new Bundle();
         extras.putInt("kind", kind);
         extras.putString("address", entry.address);
+        extras.putString("group_id", groupId);
 
         try {
             boolean requested = manager.requestPinAppWidget(provider, extras, pending);
@@ -2072,7 +2926,12 @@ public class MainActivity extends Activity {
     private void remapWidgets(String oldAddress, String newAddress) {
         for (Map.Entry<Integer, WidgetStore.Info> item : WidgetStore.all(this).entrySet()) {
             if (item.getValue().address.equals(oldAddress)) {
-                WidgetStore.put(this, item.getKey(), newAddress, item.getValue().kind);
+                if (item.getValue().kind == WidgetStore.KIND_GROUP) {
+                    WidgetStore.putGroup(
+                            this, item.getKey(), item.getValue().groupId, newAddress);
+                } else {
+                    WidgetStore.put(this, item.getKey(), newAddress, item.getValue().kind);
+                }
             }
         }
         WidgetUpdater.renderAll(this);

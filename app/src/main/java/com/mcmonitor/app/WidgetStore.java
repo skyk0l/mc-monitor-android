@@ -14,6 +14,7 @@ public final class WidgetStore {
     public static final int KIND_2X2 = 0;
     public static final int KIND_2X1 = 1;
     public static final int KIND_3X3 = 2;
+    public static final int KIND_GROUP = 3;
 
     private static final String PREFS = "mcmonitor";
     private static final String KEY_MAP = "widget_map_v1";
@@ -28,14 +29,29 @@ public final class WidgetStore {
     public static class Info {
         public final String address;
         public final int kind;
+        public final String groupId;
 
-        public Info(String address, int kind) {
+        public Info(String address, int kind, String groupId) {
             this.address = address;
             this.kind = kind;
+            this.groupId = groupId;
         }
     }
 
     public static synchronized void put(Context context, int widgetId, String address, int kind) {
+        save(context, widgetId, address, kind, "");
+    }
+
+    public static synchronized void putGroup(
+            Context context, int widgetId, String groupId, String fallbackAddress) {
+        if (groupId == null || groupId.trim().isEmpty()) {
+            return;
+        }
+        save(context, widgetId, fallbackAddress, KIND_GROUP, groupId.trim());
+    }
+
+    private static void save(
+            Context context, int widgetId, String address, int kind, String groupId) {
         if (address == null || address.isEmpty()) {
             return;
         }
@@ -44,6 +60,7 @@ public final class WidgetStore {
             JSONObject item = new JSONObject();
             item.put("address", address);
             item.put("kind", kind);
+            item.put("group_id", groupId);
             map.put(String.valueOf(widgetId), item);
         } catch (Exception ignored) {
         }
@@ -60,7 +77,10 @@ public final class WidgetStore {
         if (address.isEmpty()) {
             return null;
         }
-        return new Info(address, item.optInt("kind", KIND_2X2));
+        return new Info(
+                address,
+                item.optInt("kind", KIND_2X2),
+                item.optString("group_id", ""));
     }
 
     public static synchronized void remove(Context context, int widgetId) {
@@ -83,7 +103,10 @@ public final class WidgetStore {
                 }
                 String address = item.optString("address", "");
                 if (!address.isEmpty()) {
-                    result.put(id, new Info(address, item.optInt("kind", KIND_2X2)));
+                    result.put(id, new Info(
+                            address,
+                            item.optInt("kind", KIND_2X2),
+                            item.optString("group_id", "")));
                 }
             } catch (Exception ignored) {
             }

@@ -22,6 +22,7 @@ public class PinResultReceiver extends BroadcastReceiver {
         }
 
         String address = intent.getStringExtra("address");
+        String groupId = intent.getStringExtra("group_id");
         if (address == null || address.isEmpty()) {
             address = WidgetStore.claimPending(context, kind);
         } else {
@@ -40,7 +41,11 @@ public class PinResultReceiver extends BroadcastReceiver {
             }
         }
         if (address != null) {
-            WidgetStore.put(context, widgetId, address, kind);
+            if (kind == WidgetStore.KIND_GROUP && groupId != null && !groupId.isEmpty()) {
+                WidgetStore.putGroup(context, widgetId, groupId, address);
+            } else {
+                WidgetStore.put(context, widgetId, address, kind);
+            }
             WidgetUpdater.updateWidget(context, widgetId, false);
             WidgetJobService.schedule(context);
             WidgetJobService.requestRefresh(context);
