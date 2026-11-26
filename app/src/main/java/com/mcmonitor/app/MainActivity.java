@@ -1,6 +1,5 @@
 package com.mcmonitor.app;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
@@ -59,7 +58,7 @@ import java.util.Comparator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class MainActivity extends Activity {
+public class MainActivity extends LocalizedActivity {
 
     private static final String TAG = "MCMonitor";
     private static final int REQUEST_NOTIFICATIONS = 7102;
@@ -69,7 +68,7 @@ public class MainActivity extends Activity {
     private static final String NOTIFICATION_SETTINGS_PROMPTED =
             "priority_notification_settings_prompted";
 
-    private static final long REFRESH_INTERVAL = 15_000L;
+    private static final long REFRESH_INTERVAL = 10_000L;
     private static final long CLOUD_SYNC_INTERVAL = 5 * 60_000L;
     private static final int MAX_CHIPS = 30;
 

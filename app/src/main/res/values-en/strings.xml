@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MC Monitor</string>
+    <string name="language_section">LANGUAGE</string>
+    <string name="language_system">System default</string>
+    <string name="language_russian">Russian</string>
+    <string name="language_english">English</string>
+    <string name="language_restart_note">The app will restart after changing the language.</string>
     <string name="account_button">Account</string>
     <string name="account_recovery_note">Without an email, a forgotten password cannot be recovered.</string>
     <string name="widget_desc_2x2">Compact widget: server status and players</string>

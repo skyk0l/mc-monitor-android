@@ -1,6 +1,5 @@
 package com.mcmonitor.app;
 
-import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -29,7 +28,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class ProfileActivity extends Activity {
+public class ProfileActivity extends LocalizedActivity {
     public static final String EXTRA_PROFILE_ID = "profile_id";
     private static final int REQUEST_AVATAR = 7110;
 

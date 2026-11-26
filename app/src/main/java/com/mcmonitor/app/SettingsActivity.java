@@ -1,6 +1,5 @@
 package com.mcmonitor.app;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.PendingIntent;
 import android.app.TimePickerDialog;
@@ -43,7 +42,7 @@ import java.util.List;
 import java.util.Map;
 
 /** Dedicated settings screen for app accents and widget appearance. */
-public class SettingsActivity extends Activity {
+public class SettingsActivity extends LocalizedActivity {
     private static final String PREFERENCES = "app_settings";
     private static final String PENDING_UPDATE_APK = "pending_update_apk";
     private static final String INSTALL_STATUS_ACTION =
@@ -114,6 +113,46 @@ public class SettingsActivity extends Activity {
         TextView subtitle = text("Оформление приложения и виджетов", 13, 0xFF929A97);
         subtitle.setPadding(0, dp(5), 0, dp(20));
         content.addView(subtitle);
+
+        addSection(getString(R.string.language_section));
+        addHint(getString(R.string.language_restart_note));
+        String[] languageValues = {
+                AppLanguage.SYSTEM, "ru", "en"
+        };
+        String[] languageLabels = {
+                getString(R.string.language_system),
+                getString(R.string.language_russian),
+                getString(R.string.language_english)
+        };
+        Spinner languageSpinner = new Spinner(this);
+        ArrayAdapter<String> languageAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, languageLabels);
+        languageAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        languageSpinner.setAdapter(languageAdapter);
+        String selectedLanguage = AppLanguage.selected(this);
+        int selectedLanguageIndex = 0;
+        for (int i = 0; i < languageValues.length; i++) {
+            if (languageValues[i].equals(selectedLanguage)) {
+                selectedLanguageIndex = i;
+                break;
+            }
+        }
+        languageSpinner.setSelection(selectedLanguageIndex);
+        languageSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String language = languageValues[position];
+                if (!language.equals(AppLanguage.selected(SettingsActivity.this))) {
+                    AppLanguage.setAndRestart(SettingsActivity.this, language);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+        content.addView(languageSpinner, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
 
         addSection("ЦВЕТ ПРИЛОЖЕНИЯ");
         addColorChoices(APP_ACCENT_NAMES, APP_ACCENTS,
