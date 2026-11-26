@@ -35,7 +35,7 @@
             android:layout_marginTop="3dp"
             android:gravity="center"
             android:letterSpacing="0.13"
-            android:text="JAVA + BEDROCK  ·  МОНИТОРИНГ СЕРВЕРОВ"
+            android:text="@string/main_subtitle"
             android:textColor="@color/soft"
             android:textSize="9sp" />
 
@@ -52,7 +52,7 @@
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:background="@drawable/bg_input"
-                android:contentDescription="Поиск серверов"
+                android:contentDescription="@string/main_search_servers"
                 android:padding="10dp"
                 android:src="@drawable/ic_search"
                 android:tint="@color/soft" />
@@ -64,7 +64,7 @@
                 android:layout_marginStart="7dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_input"
-                android:hint="Поиск серверов"
+                android:hint="@string/main_search_hint"
                 android:imeOptions="actionSearch"
                 android:inputType="text"
                 android:maxLines="1"
@@ -89,7 +89,7 @@
                 android:layout_marginStart="8dp"
                 android:background="@drawable/bg_avatar"
                 android:clickable="true"
-                android:contentDescription="Профиль и аккаунт"
+                android:contentDescription="@string/main_profile_and_account"
                 android:focusable="true"
                 android:padding="10dp"
                 android:src="@drawable/ic_profile"
@@ -101,7 +101,7 @@
                 android:layout_height="40dp"
                 android:layout_marginStart="7dp"
                 android:background="@drawable/bg_input"
-                android:contentDescription="Настройки"
+                android:contentDescription="@string/main_settings_description"
                 android:padding="10dp"
                 android:src="@drawable/ic_settings"
                 android:tint="@color/soft" />
@@ -129,7 +129,7 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="sans-serif-medium"
                     android:letterSpacing="0.06"
-                    android:text="МОИ СЕРВЕРЫ"
+                    android:text="@string/main_my_servers"
                     android:textColor="@color/text"
                     android:textSize="11sp" />
 
@@ -140,7 +140,7 @@
                     android:layout_marginTop="3dp"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:text="0 серверов · 0 онлайн"
+                    android:text="@string/main_server_summary_initial"
                     android:textColor="@color/soft"
                     android:textSize="11sp" />
             </LinearLayout>
@@ -169,7 +169,7 @@
                 android:layout_height="40dp"
                 android:layout_marginStart="8dp"
                 android:background="@drawable/bg_input"
-                android:contentDescription="Обновить"
+                android:contentDescription="@string/main_refresh"
                 android:padding="10dp"
                 android:src="@drawable/ic_refresh" />
         </LinearLayout>
@@ -218,7 +218,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="14dp"
                         android:fontFamily="sans-serif-medium"
-                        android:text="Пока пусто"
+                        android:text="@string/main_empty_title"
                         android:textColor="@color/text"
                         android:textSize="20sp" />
 
@@ -229,7 +229,7 @@
                         android:layout_marginTop="6dp"
                         android:gravity="center"
                         android:lineSpacingExtra="3dp"
-                        android:text="Добавь сервер Java или Bedrock —\nпокажем онлайн и ники игроков"
+                        android:text="@string/main_empty_hint"
                         android:textColor="@color/soft"
                         android:textSize="13sp" />
                 </LinearLayout>
@@ -246,7 +246,7 @@
             android:fontFamily="sans-serif-medium"
             android:foreground="?android:attr/selectableItemBackground"
             android:gravity="center"
-            android:text="＋  Добавить сервер"
+            android:text="@string/main_add_server"
             android:textColor="#0F1A14"
             android:textSize="15sp" />
     </LinearLayout>

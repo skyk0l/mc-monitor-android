@@ -18,7 +18,7 @@
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:background="@drawable/bg_server_icon"
-            android:contentDescription="Иконка сервера"
+            android:contentDescription="@string/widget_server_icon_description"
             android:padding="3dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_server_fallback" />
@@ -62,7 +62,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:fontFamily="sans-serif-medium"
-                    android:text="нет данных"
+                    android:text="@string/main_no_data"
                     android:textColor="@color/widget_waiting"
                     android:textSize="10sp"
                     android:textStyle="bold" />
@@ -74,7 +74,7 @@
             android:layout_width="34dp"
             android:layout_height="34dp"
             android:background="@drawable/bg_widget_button"
-            android:contentDescription="Обновить"
+            android:contentDescription="@string/widget_refresh_description"
             android:gravity="center"
             android:text="↻"
             android:textColor="@color/widget_accent"
@@ -99,7 +99,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
-                android:text="СЕЙЧАС В ИГРЕ"
+                android:id="@+id/wNowPlayingLabel"
+                android:text="@string/widget_playing_now"
                 android:textColor="@color/widget_dim"
                 android:textSize="9sp"
                 android:textStyle="bold" />
@@ -137,7 +138,7 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="2"
-                android:text="Версия появится после ответа"
+                android:text="@string/widget_version_loading"
                 android:textColor="@color/widget_dim"
                 android:textSize="10sp" />
         </LinearLayout>
@@ -159,7 +160,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-medium"
-                android:text="ИГРОКИ"
+                android:text="@string/widget_players_label"
                 android:textColor="@color/widget_accent"
                 android:textSize="10sp"
                 android:textStyle="bold" />
@@ -175,7 +176,7 @@
                 android:gravity="top"
                 android:lineSpacingExtra="3dp"
                 android:maxLines="10"
-                android:text="Ники появятся после ответа сервера"
+                android:text="@string/widget_players_loading"
                 android:textColor="@color/widget_soft"
                 android:textSize="14sp"
                 android:textStyle="bold" />
@@ -203,7 +204,7 @@
             android:ellipsize="end"
             android:fontFamily="sans-serif-medium"
             android:maxLines="1"
-            android:text="адрес сервера"
+            android:text="@string/widget_address_placeholder"
             android:textColor="@color/widget_soft"
             android:textSize="10sp" />
 
@@ -213,7 +214,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:text="ещё не проверяли"
+            android:text="@string/widget_not_checked"
             android:textColor="@color/widget_dim"
             android:textSize="9sp" />
     </LinearLayout>

@@ -109,12 +109,12 @@ public class ProfileActivity extends LocalizedActivity {
         applyWindowInsets(scroll, page);
 
         Button back = new Button(this);
-        back.setText("‹   Назад");
+        back.setText(R.string.profile_back);
         back.setOnClickListener(view -> finish());
         page.addView(back, matchWrap());
 
         TextView heading = new TextView(this);
-        heading.setText(ownProfile ? "Профиль" : "Профиль игрока");
+        heading.setText(ownProfile ? R.string.profile_title : R.string.profile_player_title);
         heading.setTextColor(getColor(R.color.text));
         heading.setTextSize(24);
         heading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -150,7 +150,7 @@ public class ProfileActivity extends LocalizedActivity {
         page.addView(counts);
 
         editProfileButton = new Button(this);
-        editProfileButton.setText("Редактировать профиль");
+        editProfileButton.setText(R.string.profile_edit);
         editProfileButton.setVisibility(ownProfile ? View.VISIBLE : View.GONE);
         editProfileButton.setOnClickListener(view -> toggleEditor());
         page.addView(editProfileButton, matchWrap());
@@ -159,7 +159,12 @@ public class ProfileActivity extends LocalizedActivity {
         tabs.setOrientation(LinearLayout.HORIZONTAL);
         HorizontalScrollView tabsScroll = new HorizontalScrollView(this);
         tabsScroll.setHorizontalScrollBarEnabled(false);
-        String[] tabNames = {"Подписчики", "Подписки", "Друзья", "Серверы"};
+        String[] tabNames = {
+                getString(R.string.profile_followers),
+                getString(R.string.profile_subscriptions),
+                getString(R.string.profile_friends),
+                getString(R.string.profile_servers)
+        };
         String[] tabIds = {"followers", "subscriptions", "friends", "servers"};
         for (int i = 0; i < tabNames.length; i++) {
             final String tabId = tabIds[i];
@@ -180,7 +185,7 @@ public class ProfileActivity extends LocalizedActivity {
         page.addView(results);
 
         followButton = new Button(this);
-        followButton.setText("Подписаться");
+        followButton.setText(R.string.profile_follow);
         followButton.setVisibility(ownProfile ? View.GONE : View.VISIBLE);
         followButton.setOnClickListener(view -> toggleFollow());
         page.addView(followButton, matchWrap());
@@ -191,11 +196,11 @@ public class ProfileActivity extends LocalizedActivity {
             editPanel.setVisibility(View.GONE);
             addDivider(editPanel);
             TextView editHeading = sectionText();
-            editHeading.setText("Редактирование и приватность");
+            editHeading.setText(R.string.profile_edit_privacy);
             editPanel.addView(editHeading);
 
             Button chooseAvatar = new Button(this);
-            chooseAvatar.setText("Изменить аватар");
+            chooseAvatar.setText(R.string.profile_change_avatar);
             chooseAvatar.setOnClickListener(view -> {
                 android.content.Intent intent = new android.content.Intent(
                         android.content.Intent.ACTION_OPEN_DOCUMENT);
@@ -207,25 +212,25 @@ public class ProfileActivity extends LocalizedActivity {
 
             displayNameInput = new EditText(this);
             displayNameInput.setSingleLine(true);
-            displayNameInput.setHint("Отображаемое имя");
+            displayNameInput.setHint(R.string.profile_display_name_hint);
             editPanel.addView(displayNameInput, matchWrap());
             bioInput = new EditText(this);
-            bioInput.setHint("О себе");
+            bioInput.setHint(R.string.profile_bio_hint);
             bioInput.setMinLines(2);
             bioInput.setMaxLines(4);
             editPanel.addView(bioInput, matchWrap());
 
-            shareServers = privacyCheckBox("Показывать мои серверы");
-            shareFollowers = privacyCheckBox("Показывать подписчиков");
-            shareFriends = privacyCheckBox("Показывать друзей");
-            shareSubscriptions = privacyCheckBox("Показывать подписки на пользователей");
+            shareServers = privacyCheckBox(getString(R.string.profile_share_servers));
+            shareFollowers = privacyCheckBox(getString(R.string.profile_share_followers));
+            shareFriends = privacyCheckBox(getString(R.string.profile_share_friends));
+            shareSubscriptions = privacyCheckBox(getString(R.string.profile_share_subscriptions));
             editPanel.addView(shareServers);
             editPanel.addView(shareFollowers);
             editPanel.addView(shareFriends);
             editPanel.addView(shareSubscriptions);
 
             Button save = new Button(this);
-            save.setText("Сохранить профиль");
+            save.setText(R.string.profile_save);
             save.setOnClickListener(view -> saveProfile());
             editPanel.addView(save, matchWrap());
             page.addView(editPanel, matchWrap());
@@ -243,7 +248,7 @@ public class ProfileActivity extends LocalizedActivity {
         boolean opening = editPanel.getVisibility() != View.VISIBLE;
         editPanel.setVisibility(opening ? View.VISIBLE : View.GONE);
         editProfileButton.setText(
-                opening ? "Скрыть редактирование" : "Редактировать профиль");
+                opening ? R.string.profile_hide_editor : R.string.profile_edit);
     }
 
     private void applyWindowInsets(View root, LinearLayout content) {
@@ -272,7 +277,7 @@ public class ProfileActivity extends LocalizedActivity {
     }
 
     private void loadProfile() {
-        status.setText("Загружаю профиль…");
+        status.setText(R.string.profile_loading);
         executor.execute(() -> {
             try {
                 CloudSyncClient.PublicProfile loaded = ownProfile
@@ -296,7 +301,8 @@ public class ProfileActivity extends LocalizedActivity {
 
     private void renderProfile(byte[] image) {
         String name = profile.displayName.isEmpty()
-                ? profile.username : profile.displayName + "  @" + profile.username;
+                ? profile.username
+                : getString(R.string.profile_identity, profile.displayName, profile.username);
         identity.setText(name);
         biography.setText(profile.bio);
         if (image != null) {
@@ -309,18 +315,33 @@ public class ProfileActivity extends LocalizedActivity {
         } else {
             avatar.setImageResource(R.drawable.ic_profile);
         }
-        counts.setText(
-                (summary.canViewFollowers
-                        ? summary.followersCount + " подписчиков" : "подписчики скрыты")
-                        + "  ·  "
-                        + (summary.canViewSubscriptions
-                        ? summary.subscriptionsCount + " подписок" : "подписки скрыты")
-                        + "  ·  "
-                        + (summary.canViewFriends
-                        ? summary.friendsCount + " друзей" : "друзья скрыты")
-                        + (summary.isFollowing && summary.isFollowedBy
-                        ? "  ·  Вы друзья" : ""));
-        followButton.setText(summary.isFollowing ? "Отписаться" : "Подписаться");
+        String followerCount = summary.canViewFollowers
+                ? getResources().getQuantityString(
+                        R.plurals.profile_follower_count,
+                        summary.followersCount,
+                        summary.followersCount)
+                : getString(R.string.profile_hidden_followers);
+        String subscriptionCount = summary.canViewSubscriptions
+                ? getResources().getQuantityString(
+                        R.plurals.profile_subscription_count,
+                        summary.subscriptionsCount,
+                        summary.subscriptionsCount)
+                : getString(R.string.profile_hidden_subscriptions);
+        String friendCount = summary.canViewFriends
+                ? getResources().getQuantityString(
+                        R.plurals.profile_friend_count,
+                        summary.friendsCount,
+                        summary.friendsCount)
+                : getString(R.string.profile_hidden_friends);
+        counts.setText(getString(
+                R.string.profile_social_counts,
+                followerCount,
+                subscriptionCount,
+                friendCount,
+                summary.isFollowing && summary.isFollowedBy
+                        ? getString(R.string.profile_friend_badge) : ""));
+        followButton.setText(summary.isFollowing
+                ? R.string.profile_unfollow : R.string.profile_follow);
         if (ownProfile) {
             displayNameInput.setText(profile.displayName);
             bioInput.setText(profile.bio);
@@ -338,11 +359,11 @@ public class ProfileActivity extends LocalizedActivity {
         }
         results.removeAllViews();
         if (summary == null) {
-            addMessage("Профиль ещё загружается.");
+            addMessage(getString(R.string.profile_loading_wait));
             return;
         }
         if ("servers".equals(relationship) && !summary.canViewServers) {
-            addMessage("Список серверов скрыт владельцем профиля.");
+            addMessage(getString(R.string.profile_servers_hidden));
             return;
         }
         boolean visible = "followers".equals(relationship)
@@ -352,10 +373,10 @@ public class ProfileActivity extends LocalizedActivity {
                 : "subscriptions".equals(relationship)
                 ? summary.canViewSubscriptions : true;
         if (!visible) {
-            addMessage("Этот список скрыт владельцем профиля.");
+            addMessage(getString(R.string.profile_list_hidden));
             return;
         }
-        addMessage("Загружаю список…");
+        addMessage(getString(R.string.profile_loading_list));
         executor.execute(() -> {
             try {
                 if ("servers".equals(relationship)) {
@@ -382,7 +403,7 @@ public class ProfileActivity extends LocalizedActivity {
             List<CloudSyncClient.PublicProfile> people, String relationship) {
         results.removeAllViews();
         if (people.isEmpty()) {
-            addMessage("Пока пусто.");
+            addMessage(getString(R.string.profile_empty));
             return;
         }
         for (CloudSyncClient.PublicProfile person : people) {
@@ -402,15 +423,17 @@ public class ProfileActivity extends LocalizedActivity {
             TextView personName = sectionText();
             personName.setText((person.displayName.isEmpty()
                     ? "@" + person.username
-                    : person.displayName + "  @" + person.username)
-                    + ("friends".equals(relationship) ? "  ·  Друг" : ""));
+                    : getString(R.string.profile_identity,
+                            person.displayName, person.username))
+                    + ("friends".equals(relationship)
+                            ? getString(R.string.profile_friend_suffix) : ""));
             personName.setMaxLines(2);
             LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
             nameParams.leftMargin = dp(12);
             row.addView(personName, nameParams);
             Button open = new Button(this);
-            open.setText("Открыть");
+            open.setText(R.string.profile_open);
             open.setOnClickListener(view -> openPersonProfile(person));
             row.addView(open, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, dp(42)));
@@ -442,7 +465,7 @@ public class ProfileActivity extends LocalizedActivity {
                 }
                 Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
                 if (bitmap == null) {
-                    throw new IOException("Изображение аватара повреждено.");
+                    throw new IOException(getString(R.string.profile_broken_avatar));
                 }
                 runOnUiThread(() -> {
                     if (!isFinishing() && person.userId.equals(imageView.getTag())) {
@@ -459,7 +482,7 @@ public class ProfileActivity extends LocalizedActivity {
     private void renderServers(List<CloudSyncClient.PublicServer> servers) {
         results.removeAllViews();
         if (servers.isEmpty()) {
-            addMessage("Публичных серверов нет.");
+            addMessage(getString(R.string.profile_no_public_servers));
             return;
         }
         for (CloudSyncClient.PublicServer server : servers) {
@@ -482,7 +505,7 @@ public class ProfileActivity extends LocalizedActivity {
         boolean showFriends = shareFriends.isChecked();
         boolean showSubscriptions = shareSubscriptions.isChecked();
         byte[] avatarBytes = pendingAvatar;
-        status.setText("Сохраняю профиль…");
+        status.setText(R.string.profile_saving);
         executor.execute(() -> {
             try {
                 CloudSyncClient.updateProfile(
@@ -502,10 +525,10 @@ public class ProfileActivity extends LocalizedActivity {
                     pendingAvatar = null;
                     if (editPanel != null) {
                         editPanel.setVisibility(View.GONE);
-                        editProfileButton.setText("Редактировать профиль");
+                        editProfileButton.setText(R.string.profile_edit);
                     }
                     loadProfile();
-                    Toast.makeText(this, "Профиль сохранён.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, R.string.profile_saved, Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception exception) {
                 runOnUiThread(() -> status.setText(errorMessage(exception)));
@@ -517,7 +540,7 @@ public class ProfileActivity extends LocalizedActivity {
         if (profile == null || summary == null) {
             return;
         }
-        status.setText("Обновляю подписку…");
+        status.setText(R.string.profile_updating_follow);
         executor.execute(() -> {
             try {
                 if (summary.isFollowing) {
@@ -577,7 +600,7 @@ public class ProfileActivity extends LocalizedActivity {
                 source = BitmapFactory.decodeStream(decodeInput, null, decode);
             }
             if (source == null) {
-                throw new IOException("Не удалось открыть выбранное изображение.");
+                throw new IOException(getString(R.string.profile_image_open_failed));
             }
             int side = Math.min(source.getWidth(), source.getHeight());
             Bitmap square = Bitmap.createBitmap(source,
@@ -587,11 +610,11 @@ public class ProfileActivity extends LocalizedActivity {
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             if (!resized.compress(Bitmap.CompressFormat.JPEG, 86, output)
                     || output.size() > 2 * 1024 * 1024) {
-                throw new IOException("Изображение слишком большое для аватара.");
+                throw new IOException(getString(R.string.profile_avatar_too_large));
             }
             pendingAvatar = output.toByteArray();
             avatar.setImageBitmap(resized);
-            status.setText("Аватар готов к сохранению.");
+            status.setText(R.string.profile_avatar_ready);
         } catch (Exception exception) {
             status.setText(errorMessage(exception));
         }
@@ -666,7 +689,7 @@ public class ProfileActivity extends LocalizedActivity {
             return exception.getMessage();
         }
         return exception.getMessage() == null
-                ? "Не удалось загрузить данные профиля."
+                ? getString(R.string.profile_load_failed)
                 : exception.getMessage();
     }
 }

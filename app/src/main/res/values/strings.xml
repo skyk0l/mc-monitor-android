@@ -6,6 +6,317 @@
     <string name="language_russian">Русский</string>
     <string name="language_english">Английский</string>
     <string name="language_restart_note">Экран приложения перезапустится после смены языка.</string>
+    <string name="settings_back">‹   Назад</string>
+    <string name="settings_title">Настройки</string>
+    <string name="settings_subtitle">Оформление приложения и виджетов</string>
+    <string name="settings_app_color">ЦВЕТ ПРИЛОЖЕНИЯ</string>
+    <string name="settings_notifications">УВЕДОМЛЕНИЯ</string>
+    <string name="settings_notification_window">Уведомления о приоритетных никах приходят только в выбранное время.</string>
+    <string name="settings_dnd_mode">Режим «Не беспокоить»</string>
+    <string name="settings_servers">СПИСОК СЕРВЕРОВ</string>
+    <string name="settings_pinned_order_hint">Закреплённые серверы всегда отображаются первыми. Для ручного порядка удерживай название и перетаскивай карточку.</string>
+    <string name="settings_sort_title">Сортировка серверов</string>
+    <string name="settings_sort_prefix">Сортировка: %1$s</string>
+    <string name="settings_sort_manual">Вручную</string>
+    <string name="settings_sort_name">По имени</string>
+    <string name="settings_sort_online">По онлайну</string>
+    <string name="settings_sort_ping">По пингу (время ответа)</string>
+    <string name="settings_sort_date">По дате добавления</string>
+    <string name="settings_cancel">Отмена</string>
+    <string name="settings_widgets">ВИДЖЕТЫ</string>
+    <string name="settings_widget_hint">Настройки можно задать отдельно для каждого виджета.</string>
+    <string name="settings_account_hint">Аккаунт и синхронизация находятся в меню профиля.</string>
+    <string name="settings_updates">ОБНОВЛЕНИЯ</string>
+    <string name="settings_updates_hint">APK загружается из официального GitHub-релиза. Установку нужно подтвердить в Android.</string>
+    <string name="settings_check_updates">Проверить обновления</string>
+    <string name="settings_dnd_off">Выключить</string>
+    <string name="settings_dnd_one_hour">На 1 час</string>
+    <string name="settings_dnd_three_hours">На 3 часа</string>
+    <string name="settings_dnd_eight_hours">На 8 часов</string>
+    <string name="settings_dnd_until_disabled">Пока не отключу</string>
+    <string name="settings_dnd_title">Не беспокоить</string>
+    <string name="settings_notification_start">Уведомления с %1$s</string>
+    <string name="settings_notification_end">Уведомления до %1$s</string>
+    <string name="settings_dnd_active_manual">Не беспокоить активно — до отключения вручную.</string>
+    <string name="settings_dnd_active_until">Не беспокоить активно до %1$s.</string>
+    <string name="settings_dnd_disabled">Не беспокоить выключен.</string>
+    <string name="settings_missing_apk">Загруженный APK не найден. Проверь обновления ещё раз.</string>
+    <string name="settings_checking_updates">Проверяю GitHub Releases…</string>
+    <string name="settings_latest_version">Установлена последняя версия.</string>
+    <string name="settings_update_available">Доступна версия %1$s.</string>
+    <string name="settings_update_dialog_title">Доступно обновление</string>
+    <string name="settings_later">Позже</string>
+    <string name="settings_download_install">Скачать и установить</string>
+    <string name="settings_update_check_failed">Не удалось проверить обновления: %1$s</string>
+    <string name="settings_downloading_verify">Скачиваю и проверяю APK…</string>
+    <string name="settings_downloading_progress">Скачиваю APK… %1$d%%</string>
+    <string name="settings_apk_verified">APK проверен. Открываю установщик Android…</string>
+    <string name="settings_download_failed">Не удалось скачать обновление: %1$s</string>
+    <string name="settings_allow_install">Разреши установку приложений для MC Monitor и вернись сюда.</string>
+    <string name="settings_allow_source_install">Разреши установку из этого источника в системных настройках и повтори.</string>
+    <string name="settings_confirm_install">Ожидай запроса Android и подтверди установку обновления.</string>
+    <string name="settings_installer_failed">Не удалось открыть установщик: %1$s</string>
+    <string name="settings_widget_default">Настройки по умолчанию</string>
+    <string name="settings_widget_group">Группа %1$s</string>
+    <string name="settings_widget_name_hint">Своё имя виджета</string>
+    <string name="settings_widget_accent">АКЦЕНТНЫЙ ЦВЕТ</string>
+    <string name="settings_widget_background">ФОН</string>
+    <string name="settings_opacity">Прозрачность</string>
+    <string name="settings_widget_background_opacity">Прозрачность фона виджета</string>
+    <string name="settings_widget_show_name">Показывать название</string>
+    <string name="settings_widget_show_players">Показывать список игроков</string>
+    <string name="settings_widget_show_version">Показывать версию</string>
+    <string name="settings_widget_show_updated">Показывать время обновления</string>
+    <string name="profile_back">‹   Назад</string>
+    <string name="profile_title">Профиль</string>
+    <string name="profile_player_title">Профиль игрока</string>
+    <string name="profile_identity">%1$s  @%2$s</string>
+    <string name="profile_social_counts">%1$s  ·  %2$s  ·  %3$s%4$s</string>
+    <string name="profile_edit">Редактировать профиль</string>
+    <string name="profile_followers">Подписчики</string>
+    <string name="profile_subscriptions">Подписки</string>
+    <string name="profile_friends">Друзья</string>
+    <string name="profile_servers">Серверы</string>
+    <string name="profile_follow">Подписаться</string>
+    <string name="profile_unfollow">Отписаться</string>
+    <string name="profile_edit_privacy">Редактирование и приватность</string>
+    <string name="profile_change_avatar">Изменить аватар</string>
+    <string name="profile_display_name_hint">Отображаемое имя</string>
+    <string name="profile_bio_hint">О себе</string>
+    <string name="profile_share_servers">Показывать мои серверы</string>
+    <string name="profile_share_followers">Показывать подписчиков</string>
+    <string name="profile_share_friends">Показывать друзей</string>
+    <string name="profile_share_subscriptions">Показывать подписки на пользователей</string>
+    <string name="profile_save">Сохранить профиль</string>
+    <string name="profile_hide_editor">Скрыть редактирование</string>
+    <string name="profile_loading">Загружаю профиль…</string>
+    <string name="profile_hidden_followers">подписчики скрыты</string>
+    <string name="profile_hidden_subscriptions">подписки скрыты</string>
+    <string name="profile_hidden_friends">друзья скрыты</string>
+    <string name="profile_friend_badge">  ·  Вы друзья</string>
+    <string name="profile_loading_wait">Профиль ещё загружается.</string>
+    <string name="profile_servers_hidden">Список серверов скрыт владельцем профиля.</string>
+    <string name="profile_list_hidden">Этот список скрыт владельцем профиля.</string>
+    <string name="profile_loading_list">Загружаю список…</string>
+    <string name="profile_empty">Пока пусто.</string>
+    <string name="profile_friend_suffix">  ·  Друг</string>
+    <string name="profile_open">Открыть</string>
+    <string name="profile_no_public_servers">Публичных серверов нет.</string>
+    <string name="profile_saving">Сохраняю профиль…</string>
+    <string name="profile_saved">Профиль сохранён.</string>
+    <string name="profile_updating_follow">Обновляю подписку…</string>
+    <string name="profile_broken_avatar">Изображение аватара повреждено.</string>
+    <string name="profile_image_open_failed">Не удалось открыть выбранное изображение.</string>
+    <string name="profile_avatar_too_large">Изображение слишком большое для аватара.</string>
+    <string name="profile_avatar_ready">Аватар готов к сохранению.</string>
+    <string name="profile_load_failed">Не удалось загрузить данные профиля.</string>
+    <string name="main_subtitle">JAVA + BEDROCK  ·  МОНИТОРИНГ СЕРВЕРОВ</string>
+    <string name="main_my_servers">МОИ СЕРВЕРЫ</string>
+    <string name="main_add_server">＋  Добавить сервер</string>
+    <string name="main_profile_and_account">Профиль и аккаунт</string>
+    <string name="main_settings_description">Настройки</string>
+    <string name="main_refresh">Обновить</string>
+    <string name="main_search_hint">Поиск серверов</string>
+    <string name="main_notifications_enabled">Уведомления о приоритетных игроках включены.</string>
+    <string name="main_notifications_disabled">Уведомления отключены</string>
+    <string name="main_enable_notifications_message">Разреши уведомления для MC Monitor в настройках Android, чтобы получать оповещения о входе и выходе приоритетных игроков.</string>
+    <string name="main_later">Позже</string>
+    <string name="main_open_settings">Открыть настройки</string>
+    <string name="main_search_no_results">Ничего не найдено</string>
+    <string name="main_empty_title">Пока пусто</string>
+    <string name="main_search_hint_empty">Измени запрос — список обновляется по мере ввода</string>
+    <string name="main_empty_hint">Добавь сервер Java или Bedrock —\nпокажем онлайн и ники игроков</string>
+    <string name="main_online_summary">%1$d онлайн</string>
+    <string name="main_server_summary">%1$s · %2$d онлайн</string>
+    <string name="main_server_summary_initial">0 серверов · 0 онлайн</string>
+    <string name="main_checking">проверяю</string>
+    <string name="main_no_connection">нет связи</string>
+    <string name="main_online">онлайн</string>
+    <string name="main_offline">офлайн</string>
+    <string name="main_hidden_player_list">список скрыт</string>
+    <string name="main_empty_players">пусто</string>
+    <string name="main_players_count">%1$d из %2$d</string>
+    <string name="main_more_players">+%1$d ещё</string>
+    <string name="main_loading_players">Тяну список игроков…</string>
+    <string name="main_server_unreachable">Нет связи с сервером</string>
+    <string name="main_server_offline">Сервер сейчас офлайн</string>
+    <string name="main_server_hides_players">Сервер не показывает список игроков</string>
+    <string name="main_no_players_online">На сервере никого нет</string>
+    <string name="main_loading_status">тяну статус…</string>
+    <string name="main_no_data">нет данных</string>
+    <string name="main_server_not_responding">Сервер не отвечает</string>
+    <string name="main_bedrock_prefix">Bedrock · </string>
+    <string name="main_close_search">Закрыть поиск</string>
+    <string name="main_search_servers">Поиск серверов</string>
+    <string name="main_community_search_min">Для поиска сообщества введи хотя бы 2 символа.</string>
+    <string name="main_community_search_signin">Войди в аккаунт, чтобы искать серверы и игроков сообщества.</string>
+    <string name="main_profile_signin_description">Профиль: войти или создать аккаунт</string>
+    <string name="main_profile_description">Профиль %1$s</string>
+    <string name="main_login">Войти</string>
+    <string name="main_create_account">Создать аккаунт</string>
+    <string name="main_account">Аккаунт</string>
+    <string name="main_close">Закрыть</string>
+    <string name="main_profile_menu_search">Поиск игроков и серверов</string>
+    <string name="main_my_subscriptions">Мои подписки</string>
+    <string name="main_sync_now">Синхронизировать сейчас</string>
+    <string name="main_logout">Выйти из аккаунта</string>
+    <string name="main_logout_title">Выйти из аккаунта?</string>
+    <string name="main_logout_message">Локальный список серверов останется на устройстве.</string>
+    <string name="main_logout_button">Выйти</string>
+    <string name="main_logged_out">Вы вышли из аккаунта.</string>
+    <string name="main_display_name_hint">Отображаемое имя</string>
+    <string name="main_bio_hint">О себе (до 160 символов)</string>
+    <string name="main_share_server_addresses">Публично показывать адреса моих серверов</string>
+    <string name="main_private_by_default">Выключено по умолчанию. При включении адреса будут видны авторизованным пользователям в поиске.</string>
+    <string name="main_choose_avatar">Выбрать аватар</string>
+    <string name="main_loading_profile">Загружаю профиль…</string>
+    <string name="main_my_profile">Мой профиль</string>
+    <string name="main_save">Сохранить</string>
+    <string name="main_avatar_not_set">Аватар не установлен.</string>
+    <string name="main_avatar_set">Текущий аватар установлен.</string>
+    <string name="main_avatar_load_failed">Не удалось загрузить аватар: %1$s</string>
+    <string name="main_saving_profile">Сохраняю профиль…</string>
+    <string name="main_profile_saved">Профиль сохранён.</string>
+    <string name="main_avatar_too_large">Изображение слишком большое для аватара.</string>
+    <string name="main_avatar_ready">Аватар готов к загрузке.</string>
+    <string name="main_image_open_failed">Не удалось открыть изображение: %1$s</string>
+    <string name="main_selected_file_not_image">Выбранный файл не является изображением.</string>
+    <string name="main_image_read_failed">Не удалось прочитать изображение.</string>
+    <string name="main_no_cloud_connection">Не удалось подключиться к облаку.</string>
+    <string name="main_subscription_search">Подписки</string>
+    <string name="main_community_players">Игроки</string>
+    <string name="main_community_servers">Серверы</string>
+    <string name="main_community_tab_subscriptions">Подписки</string>
+    <string name="main_community_search_hint">Ник, имя или сервер (от 2 символов)</string>
+    <string name="main_community_title">Сообщество</string>
+    <string name="main_enter_two_characters">Введи не менее двух символов для поиска.</string>
+    <string name="main_searching">Ищу…</string>
+    <string name="main_not_following_anyone">Ты пока ни на кого не подписан.</string>
+    <string name="main_nothing_found">Ничего не найдено.</string>
+    <string name="main_public_servers_not_found">Публичных серверов не найдено.</string>
+    <string name="main_add">Добавить</string>
+    <string name="main_server_already_added">Этот сервер уже есть в списке.</string>
+    <string name="main_server_added">Сервер добавлен.</string>
+    <string name="main_servers_synced">%1$d серверов синхронизировано</string>
+    <string name="server_action_edit">Изменить</string>
+    <string name="server_action_add_widget">Добавить виджет</string>
+    <string name="server_action_priority_players">Приоритеты игроков…</string>
+    <string name="server_action_add_group">Добавить в группу…</string>
+    <string name="server_action_group">Группа: %1$s</string>
+    <string name="server_action_unpin">Открепить сервер</string>
+    <string name="server_action_pin">Закрепить сервер</string>
+    <string name="server_action_unpin_group">Открепить группу</string>
+    <string name="server_action_pin_group">Закрепить группу</string>
+    <string name="server_action_delete">Удалить</string>
+    <string name="priority_examples">Например:\nNotch\nJeb_\nDinnerbone</string>
+    <string name="priority_dialog_title">Приоритеты · %1$s</string>
+    <string name="priority_dialog_message">Уведомления о входе и выходе будут только для этих ников.</string>
+    <string name="priority_invalid_nickname">Ник до 32 символов, без пробелов</string>
+    <string name="priority_limit_reached">Можно отслеживать не больше 50 ников</string>
+    <string name="priority_disabled">Отслеживание игроков выключено</string>
+    <string name="priority_saved">Приоритеты сохранены и синхронизируются</string>
+    <string name="group_none">Без группы</string>
+    <string name="group_create_option">＋ Создать новую группу</string>
+    <string name="group_dialog_title">Группа серверов</string>
+    <string name="group_name_hint">Название группы</string>
+    <string name="group_new_title">Новая группа</string>
+    <string name="group_create">Создать</string>
+    <string name="group_name_error">Название должно содержать 1–60 символов</string>
+    <string name="group_server_removed">Сервер убран из группы</string>
+    <string name="group_server_added">Сервер добавлен в группу %1$s</string>
+    <string name="server_address_hint_java">mc.example.com или host:25565</string>
+    <string name="server_address_hint_bedrock">mc.example.com или host:19132</string>
+    <string name="server_address_label_bedrock">Адрес сервера Bedrock</string>
+    <string name="server_address_label_java">IP сервера</string>
+    <string name="server_edition_label">Издание Minecraft</string>
+    <string name="server_name_label">Название</string>
+    <string name="server_name_from_motd_hint">Пусто — возьмём из MOTD</string>
+    <string name="server_icon_description">Иконка сервера</string>
+    <string name="server_menu_description">Меню сервера</string>
+    <string-array name="server_protocol_names">
+        <item>Java Edition</item>
+        <item>Bedrock Edition</item>
+    </string-array>
+    <string name="server_protocol_hint_bedrock">Bedrock Edition · порт по умолчанию 19132</string>
+    <string name="server_protocol_hint_java">Java Edition · порт по умолчанию 25565</string>
+    <string name="server_new_title">Новый сервер</string>
+    <string name="server_edit_title">Изменить сервер</string>
+    <string name="server_enter_address">Введи IP или домен сервера</string>
+    <string name="server_address_too_long">Слишком длинный адрес</string>
+    <string name="server_duplicate">Этот сервер уже есть в списке</string>
+    <string name="server_delete_title">Удалить сервер?</string>
+    <string name="server_delete_message">«%1$s» исчезнет из списка.</string>
+    <string name="widget_server_title">Виджет для «%1$s»</string>
+    <string name="widget_how_to_add_title">Как добавить виджет</string>
+    <string name="widget_how_to_add_message">Зажми пустое место на главном экране → «Виджеты» → найди MC Monitor → выбери 2×1, 2×2 или 3×3.\n\nЧтобы виджет показывал конкретный сервер, удобнее добавлять его из меню ⋮ у сервера.</string>
+    <string name="widget_understood">Понятно</string>
+    <string-array name="widget_sizes">
+        <item>2 × 2 · компактный</item>
+        <item>2 × 1 · мини-виджет</item>
+        <item>3 × 3 · со списком игроков</item>
+    </string-array>
+    <string-array name="main_account_actions">
+        <item>Профиль</item>
+        <item>Поиск игроков и серверов</item>
+        <item>Мои подписки</item>
+        <item>Синхронизировать сейчас</item>
+        <item>Выйти из аккаунта</item>
+    </string-array>
+    <string-array name="main_community_tabs">
+        <item>Игроки</item>
+        <item>Серверы</item>
+        <item>Подписки</item>
+    </string-array>
+    <plurals name="main_server_count">
+        <item quantity="one">%d сервер</item>
+        <item quantity="few">%d сервера</item>
+        <item quantity="many">%d серверов</item>
+        <item quantity="other">%d сервера</item>
+    </plurals>
+    <plurals name="main_profile_server_count">
+        <item quantity="one">%d сервер в вашем списке</item>
+        <item quantity="few">%d сервера в вашем списке</item>
+        <item quantity="many">%d серверов в вашем списке</item>
+        <item quantity="other">%d сервера в вашем списке</item>
+    </plurals>
+    <plurals name="profile_follower_count">
+        <item quantity="one">%d подписчик</item>
+        <item quantity="few">%d подписчика</item>
+        <item quantity="many">%d подписчиков</item>
+        <item quantity="other">%d подписчика</item>
+    </plurals>
+    <plurals name="profile_subscription_count">
+        <item quantity="one">%d подписка</item>
+        <item quantity="few">%d подписки</item>
+        <item quantity="many">%d подписок</item>
+        <item quantity="other">%d подписки</item>
+    </plurals>
+    <plurals name="profile_friend_count">
+        <item quantity="one">%d друг</item>
+        <item quantity="few">%d друга</item>
+        <item quantity="many">%d друзей</item>
+        <item quantity="other">%d друга</item>
+    </plurals>
+    <string-array name="app_accent_names">
+        <item>Мятный</item>
+        <item>Голубой</item>
+        <item>Лавандовый</item>
+        <item>Розовый</item>
+        <item>Янтарный</item>
+    </string-array>
+    <string-array name="widget_accent_names">
+        <item>Мятный</item>
+        <item>Голубой</item>
+        <item>Лавандовый</item>
+        <item>Розовый</item>
+        <item>Янтарный</item>
+    </string-array>
+    <string-array name="widget_background_names">
+        <item>Графит</item>
+        <item>Синий</item>
+        <item>Фиолетовый</item>
+        <item>Тёплый</item>
+    </string-array>
     <string name="account_button">Аккаунт</string>
     <string name="account_recovery_note">Без email восстановить забытый пароль нельзя.</string>
     <string name="widget_desc_2x2">Компактный виджет: онлайн и игроки сервера</string>
@@ -77,4 +388,24 @@
     <string name="widget_group_description">Виджет, который переключается между серверами выбранной группы.</string>
     <string name="widget_group_empty">Добавь серверы в группу, чтобы листать их здесь.</string>
     <string name="widget_refresh_description">Обновить сервер</string>
+    <string name="widget_status_refreshing">обновляю</string>
+    <string name="widget_not_checked">ещё не проверяли</string>
+    <string name="widget_updated_at">обновлено %1$s</string>
+    <string name="widget_server_offline">сервер офлайн</string>
+    <string name="widget_more_players">и ещё %1$d</string>
+    <string name="widget_players_count_label">ИГРОКИ · %1$d</string>
+    <string name="widget_server_icon_description">Иконка сервера</string>
+    <string name="widget_playing_now">СЕЙЧАС В ИГРЕ</string>
+    <string name="widget_version_loading">Версия появится после ответа</string>
+    <string name="widget_address_placeholder">адрес сервера</string>
+    <string name="widget_loading">Загружаю виджет…</string>
+    <string name="widget_loading_short">MC Monitor · загрузка…</string>
+    <string name="notification_priority_channel">Приоритетные игроки</string>
+    <string name="notification_player_joined">%1$s зашёл</string>
+    <string name="notification_player_left">%1$s вышел</string>
+    <string name="notification_players_changed">%1$s · онлайн: %2$d</string>
+    <string name="update_installed">Обновление установлено.</string>
+    <string name="update_install_failed">Не удалось установить обновление: %1$s</string>
+    <string name="update_install_failed_generic">Не удалось установить обновление.</string>
+    <string name="widget_added">Виджет добавлен</string>
 </resources>

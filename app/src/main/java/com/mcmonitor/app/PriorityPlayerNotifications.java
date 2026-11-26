@@ -30,6 +30,7 @@ public final class PriorityPlayerNotifications {
             ServerEntry server,
             ServerStatus previous,
             ServerStatus current) {
+        context = AppLanguage.wrap(context);
         if (server == null
                 || previous == null
                 || current == null
@@ -67,12 +68,17 @@ public final class PriorityPlayerNotifications {
 
         List<String> parts = new ArrayList<>();
         if (!joined.isEmpty()) {
-            parts.add("зашёл " + String.join(", ", joined));
+            parts.add(context.getString(
+                    R.string.notification_player_joined, String.join(", ", joined)));
         }
         if (!left.isEmpty()) {
-            parts.add("вышел " + String.join(", ", left));
+            parts.add(context.getString(
+                    R.string.notification_player_left, String.join(", ", left)));
         }
-        String message = String.join("; ", parts) + " · " + current.onlineCount;
+        String message = context.getString(
+                R.string.notification_players_changed,
+                String.join("; ", parts),
+                current.onlineCount);
 
         NotificationManager manager = (NotificationManager)
                 context.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -81,7 +87,9 @@ public final class PriorityPlayerNotifications {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "Приоритетные игроки", NotificationManager.IMPORTANCE_DEFAULT);
+                    CHANNEL_ID,
+                    context.getString(R.string.notification_priority_channel),
+                    NotificationManager.IMPORTANCE_DEFAULT);
             manager.createNotificationChannel(channel);
         }
 

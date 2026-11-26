@@ -19,16 +19,9 @@ public final class WidgetSettingsStore {
     public static final int[] ACCENTS = {
             0xFFA7C6A4, 0xFF8DBBFF, 0xFFC1A0FF, 0xFFFF9DB5, 0xFFFFC978
     };
-    public static final String[] ACCENT_NAMES = {
-            "Мятный", "Голубой", "Лавандовый", "Розовый", "Янтарный"
-    };
     public static final int[] BACKGROUNDS = {
             0xFF151B1B, 0xFF172235, 0xFF251D32, 0xFF30231B
     };
-    public static final String[] BACKGROUND_NAMES = {
-            "Графит", "Синий", "Фиолетовый", "Тёплый"
-    };
-
     private WidgetSettingsStore() {
     }
 

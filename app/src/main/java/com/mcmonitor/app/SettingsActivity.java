@@ -51,10 +51,6 @@ public class SettingsActivity extends LocalizedActivity {
     private static final int[] APP_ACCENTS = {
             0xFF7EE0A3, 0xFF7EB9FF, 0xFFBF9DFF, 0xFFFF83A7, 0xFFFFC978
     };
-    private static final String[] APP_ACCENT_NAMES = {
-            "Мятный", "Голубой", "Лавандовый", "Розовый", "Янтарный"
-    };
-
     private LinearLayout content;
     private View root;
     private BackdropView backdrop;
@@ -101,16 +97,16 @@ public class SettingsActivity extends LocalizedActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         setContentView(frame);
 
-        TextView back = text("‹   Назад", 15, 0xFFA7C6A4);
+        TextView back = text(getString(R.string.settings_back), 15, 0xFFA7C6A4);
         back.setTypeface(Typeface.DEFAULT_BOLD);
         back.setPadding(0, 0, 0, dp(18));
         back.setOnClickListener(v -> finish());
         content.addView(back);
 
-        TextView title = text("Настройки", 28, 0xFFE6E9E5);
+        TextView title = text(getString(R.string.settings_title), 28, 0xFFE6E9E5);
         title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         content.addView(title);
-        TextView subtitle = text("Оформление приложения и виджетов", 13, 0xFF929A97);
+        TextView subtitle = text(getString(R.string.settings_subtitle), 13, 0xFF929A97);
         subtitle.setPadding(0, dp(5), 0, dp(20));
         content.addView(subtitle);
 
@@ -154,8 +150,8 @@ public class SettingsActivity extends LocalizedActivity {
         content.addView(languageSpinner, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
 
-        addSection("ЦВЕТ ПРИЛОЖЕНИЯ");
-        addColorChoices(APP_ACCENT_NAMES, APP_ACCENTS,
+        addSection(getString(R.string.settings_app_color));
+        addColorChoices(getResources().getStringArray(R.array.app_accent_names), APP_ACCENTS,
                 getSharedPreferences("app_settings", MODE_PRIVATE)
                         .getInt("accent_color", APP_ACCENTS[0]),
                 color -> {
@@ -167,8 +163,8 @@ public class SettingsActivity extends LocalizedActivity {
                                     ? Color.TRANSPARENT : BackdropView.topBarColor(color));
                 });
 
-        addSection("УВЕДОМЛЕНИЯ");
-        addHint("Уведомления о приоритетных никах приходят только в выбранное время.");
+        addSection(getString(R.string.settings_notifications));
+        addHint(getString(R.string.settings_notification_window));
         notificationStartButton = new Button(this);
         notificationStartButton.setOnClickListener(v -> chooseNotificationTime(true));
         content.addView(notificationStartButton, new LinearLayout.LayoutParams(
@@ -181,19 +177,24 @@ public class SettingsActivity extends LocalizedActivity {
         dndStatus.setPadding(0, dp(6), 0, dp(6));
         content.addView(dndStatus);
         Button dndButton = new Button(this);
-        dndButton.setText("Режим «Не беспокоить»");
+        dndButton.setText(R.string.settings_dnd_mode);
         dndButton.setOnClickListener(v -> showDndOptions());
         content.addView(dndButton, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
         updateNotificationLabels();
 
-        addSection("СПИСОК СЕРВЕРОВ");
-        addHint("Закреплённые серверы всегда отображаются первыми. Для ручного порядка удерживай название и перетаскивай карточку.");
+        addSection(getString(R.string.settings_servers));
+        addHint(getString(R.string.settings_pinned_order_hint));
         Button sortButton = new Button(this);
         updateSortLabel(sortButton);
         sortButton.setOnClickListener(v -> {
-            String[] labels = {"Вручную", "По имени", "По онлайну",
-                    "По пингу (время ответа)", "По дате добавления"};
+            String[] labels = {
+                    getString(R.string.settings_sort_manual),
+                    getString(R.string.settings_sort_name),
+                    getString(R.string.settings_sort_online),
+                    getString(R.string.settings_sort_ping),
+                    getString(R.string.settings_sort_date)
+            };
             String[] values = {"manual", "name", "online", "ping", "date"};
             String selected = getSharedPreferences(PREFERENCES, MODE_PRIVATE)
                     .getString("server_sort_mode", "manual");
@@ -205,7 +206,7 @@ public class SettingsActivity extends LocalizedActivity {
                 }
             }
             new AlertDialog.Builder(this)
-                    .setTitle("Сортировка серверов")
+                    .setTitle(R.string.settings_sort_title)
                     .setSingleChoiceItems(labels, selectedIndex, (dialog, which) -> {
                         getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit()
                                 .putString("server_sort_mode", values[which])
@@ -213,14 +214,14 @@ public class SettingsActivity extends LocalizedActivity {
                         updateSortLabel(sortButton);
                         dialog.dismiss();
                     })
-                    .setNegativeButton("Отмена", null)
+                    .setNegativeButton(R.string.settings_cancel, null)
                     .show();
         });
         content.addView(sortButton, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
 
-        addSection("ВИДЖЕТЫ");
-        addHint("Настройки можно задать отдельно для каждого виджета.");
+        addSection(getString(R.string.settings_widgets));
+        addHint(getString(R.string.settings_widget_hint));
         widgetTarget = new Spinner(this);
         content.addView(widgetTarget, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
@@ -229,14 +230,14 @@ public class SettingsActivity extends LocalizedActivity {
         content.addView(widgetOptions);
         setupWidgetTargets();
 
-        TextView account = text("Аккаунт и синхронизация находятся в меню профиля.", 12, 0xFF929A97);
+        TextView account = text(getString(R.string.settings_account_hint), 12, 0xFF929A97);
         account.setPadding(0, dp(18), 0, 0);
         content.addView(account);
 
-        addSection("ОБНОВЛЕНИЯ");
-        addHint("APK загружается из официального GitHub-релиза. Установку нужно подтвердить в Android.");
+        addSection(getString(R.string.settings_updates));
+        addHint(getString(R.string.settings_updates_hint));
         updateButton = new Button(this);
-        updateButton.setText("Проверить обновления");
+        updateButton.setText(R.string.settings_check_updates);
         updateButton.setOnClickListener(v -> checkForUpdates());
         content.addView(updateButton, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
@@ -280,20 +281,20 @@ public class SettingsActivity extends LocalizedActivity {
 
     private void showDndOptions() {
         String[] options = {
-                "Выключить",
-                "На 1 час",
-                "На 3 часа",
-                "На 8 часов",
-                "Пока не отключу"
+                getString(R.string.settings_dnd_off),
+                getString(R.string.settings_dnd_one_hour),
+                getString(R.string.settings_dnd_three_hours),
+                getString(R.string.settings_dnd_eight_hours),
+                getString(R.string.settings_dnd_until_disabled)
         };
         int[] durations = {0, 3600, 3 * 3600, 8 * 3600, -1};
         new AlertDialog.Builder(this)
-                .setTitle("Не беспокоить")
+                .setTitle(R.string.settings_dnd_title)
                 .setItems(options, (dialog, which) -> {
                     NotificationPolicy.setDndDuration(this, durations[which]);
                     updateNotificationLabels();
                 })
-                .setNegativeButton("Отмена", null)
+                .setNegativeButton(R.string.settings_cancel, null)
                 .show();
     }
 
@@ -301,23 +302,25 @@ public class SettingsActivity extends LocalizedActivity {
         if (notificationStartButton == null || notificationEndButton == null) {
             return;
         }
-        notificationStartButton.setText(
-                "Уведомления с " + formatMinute(NotificationPolicy.startMinute(this)));
+        notificationStartButton.setText(getString(
+                R.string.settings_notification_start,
+                formatMinute(NotificationPolicy.startMinute(this))));
         int end = NotificationPolicy.endMinute(this);
-        notificationEndButton.setText(
-                "Уведомления до " + (end == 1440 ? "24:00" : formatMinute(end)));
+        notificationEndButton.setText(getString(
+                R.string.settings_notification_end,
+                end == 1440 ? "24:00" : formatMinute(end)));
         if (dndStatus == null) {
             return;
         }
         long until = NotificationPolicy.dndUntil(this);
         if (until == -1) {
-            dndStatus.setText("Не беспокоить активно — до отключения вручную.");
+            dndStatus.setText(R.string.settings_dnd_active_manual);
         } else if (until > System.currentTimeMillis()) {
             String time = android.text.format.DateFormat.getTimeFormat(this)
                     .format(new java.util.Date(until));
-            dndStatus.setText("Не беспокоить активно до " + time + ".");
+            dndStatus.setText(getString(R.string.settings_dnd_active_until, time));
         } else {
-            dndStatus.setText("Не беспокоить выключен.");
+            dndStatus.setText(R.string.settings_dnd_disabled);
         }
     }
 
@@ -327,22 +330,22 @@ public class SettingsActivity extends LocalizedActivity {
         String label;
         switch (mode) {
             case "name":
-                label = "По имени";
+                label = getString(R.string.settings_sort_name);
                 break;
             case "online":
-                label = "По онлайну";
+                label = getString(R.string.settings_sort_online);
                 break;
             case "ping":
-                label = "По пингу (время ответа)";
+                label = getString(R.string.settings_sort_ping);
                 break;
             case "date":
-                label = "По дате добавления";
+                label = getString(R.string.settings_sort_date);
                 break;
             default:
-                label = "Вручную";
+                label = getString(R.string.settings_sort_manual);
                 break;
         }
-        button.setText("Сортировка: " + label);
+        button.setText(getString(R.string.settings_sort_prefix, label));
     }
 
     private String formatMinute(int minute) {
@@ -364,7 +367,7 @@ public class SettingsActivity extends LocalizedActivity {
                 if (apk.isFile()) {
                     installUpdate(apk);
                 } else if (updateStatus != null) {
-                    updateStatus.setText("Загруженный APK не найден. Проверь обновления ещё раз.");
+                    updateStatus.setText(R.string.settings_missing_apk);
                 }
             }
         }
@@ -373,27 +376,28 @@ public class SettingsActivity extends LocalizedActivity {
     private void checkForUpdates() {
         updateButton.setEnabled(false);
         updateProgress.setVisibility(View.GONE);
-        updateStatus.setText("Проверяю GitHub Releases…");
+        updateStatus.setText(R.string.settings_checking_updates);
         AppUpdateManager.checkForUpdate(this, new AppUpdateManager.CheckCallback() {
             @Override
             public void onLatest() {
                 updateButton.setEnabled(true);
-                updateStatus.setText("Установлена последняя версия.");
+                updateStatus.setText(R.string.settings_latest_version);
             }
 
             @Override
             public void onUpdateAvailable(AppUpdateManager.UpdateInfo update) {
                 updateButton.setEnabled(true);
-                updateStatus.setText("Доступна версия " + update.version + ".");
-                String message = "Доступна версия " + update.version + ".";
+                String available = getString(R.string.settings_update_available, update.version);
+                updateStatus.setText(available);
+                String message = available;
                 if (!update.notes.trim().isEmpty()) {
                     message += "\n\n" + update.notes.trim();
                 }
                 new AlertDialog.Builder(SettingsActivity.this)
-                        .setTitle("Доступно обновление")
+                        .setTitle(R.string.settings_update_dialog_title)
                         .setMessage(message)
-                        .setNegativeButton("Позже", (dialog, which) -> dialog.dismiss())
-                        .setPositiveButton("Скачать и установить",
+                        .setNegativeButton(R.string.settings_later, (dialog, which) -> dialog.dismiss())
+                        .setPositiveButton(R.string.settings_download_install,
                                 (dialog, which) -> downloadUpdate(update))
                         .show();
             }
@@ -401,7 +405,7 @@ public class SettingsActivity extends LocalizedActivity {
             @Override
             public void onError(String message) {
                 updateButton.setEnabled(true);
-                updateStatus.setText("Не удалось проверить обновления: " + message);
+                updateStatus.setText(getString(R.string.settings_update_check_failed, message));
             }
         });
     }
@@ -410,19 +414,19 @@ public class SettingsActivity extends LocalizedActivity {
         updateButton.setEnabled(false);
         updateProgress.setProgress(0);
         updateProgress.setVisibility(View.VISIBLE);
-        updateStatus.setText("Скачиваю и проверяю APK…");
+        updateStatus.setText(R.string.settings_downloading_verify);
         AppUpdateManager.download(this, update, new AppUpdateManager.DownloadCallback() {
             @Override
             public void onProgress(int percent) {
                 updateProgress.setProgress(percent);
-                updateStatus.setText("Скачиваю APK… " + percent + "%");
+                updateStatus.setText(getString(R.string.settings_downloading_progress, percent));
             }
 
             @Override
             public void onDownloaded(File apk) {
                 updateButton.setEnabled(true);
                 updateProgress.setProgress(100);
-                updateStatus.setText("APK проверен. Открываю установщик Android…");
+                updateStatus.setText(R.string.settings_apk_verified);
                 installUpdate(apk);
             }
 
@@ -430,7 +434,7 @@ public class SettingsActivity extends LocalizedActivity {
             public void onError(String message) {
                 updateButton.setEnabled(true);
                 updateProgress.setVisibility(View.GONE);
-                updateStatus.setText("Не удалось скачать обновление: " + message);
+                updateStatus.setText(getString(R.string.settings_download_failed, message));
             }
         });
     }
@@ -440,14 +444,13 @@ public class SettingsActivity extends LocalizedActivity {
                 && !getPackageManager().canRequestPackageInstalls()) {
             getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit()
                     .putString(PENDING_UPDATE_APK, apk.getAbsolutePath()).apply();
-            updateStatus.setText("Разреши установку приложений для MC Monitor и вернись сюда.");
+            updateStatus.setText(R.string.settings_allow_install);
             try {
                 startActivity(new Intent(
                         Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                         Uri.parse("package:" + getPackageName())));
             } catch (android.content.ActivityNotFoundException exception) {
-                updateStatus.setText(
-                        "Разреши установку из этого источника в системных настройках и повтори.");
+                updateStatus.setText(R.string.settings_allow_source_install);
             }
             return;
         }
@@ -484,12 +487,13 @@ public class SettingsActivity extends LocalizedActivity {
             } finally {
                 session.close();
             }
-            updateStatus.setText("Ожидай запроса Android и подтверди установку обновления.");
+            updateStatus.setText(R.string.settings_confirm_install);
         } catch (IOException | SecurityException | IllegalArgumentException exception) {
             if (sessionId >= 0) {
                 installer.abandonSession(sessionId);
             }
-            updateStatus.setText("Не удалось открыть установщик: " + exception.getMessage());
+            updateStatus.setText(getString(
+                    R.string.settings_installer_failed, exception.getMessage()));
         }
     }
 
@@ -551,7 +555,7 @@ public class SettingsActivity extends LocalizedActivity {
     private void setupWidgetTargets() {
         List<String> labels = new ArrayList<>();
         widgetTargetIds.clear();
-        labels.add("Настройки по умолчанию");
+        labels.add(getString(R.string.settings_widget_default));
         widgetTargetIds.add(0);
 
         for (Map.Entry<Integer, WidgetStore.Info> entry : WidgetStore.all(this).entrySet()) {
@@ -559,7 +563,7 @@ public class SettingsActivity extends LocalizedActivity {
             String label;
             if (info.kind == WidgetStore.KIND_GROUP
                     && info.groupId != null && !info.groupId.isEmpty()) {
-                label = "Группа " + info.groupId;
+                label = getString(R.string.settings_widget_group, info.groupId);
             } else {
                 ServerEntry server = ServerStore.findByAddress(this, info.address);
                 label = server == null ? info.address : server.displayName();
@@ -591,7 +595,7 @@ public class SettingsActivity extends LocalizedActivity {
         if (widgetId > 0) {
             EditText name = new EditText(this);
             name.setSingleLine(true);
-            name.setHint("Своё имя виджета");
+            name.setHint(R.string.settings_widget_name_hint);
             name.setTextColor(0xFFE6E9E5);
             name.setHintTextColor(0xFF929A97);
             name.setText(WidgetSettingsStore.name(this, widgetId));
@@ -614,10 +618,10 @@ public class SettingsActivity extends LocalizedActivity {
             widgetOptions.addView(name);
         }
 
-        addSection(widgetOptions, "АКЦЕНТНЫЙ ЦВЕТ");
+        addSection(widgetOptions, getString(R.string.settings_widget_accent));
         addColorChoices(
                 widgetOptions,
-                WidgetSettingsStore.ACCENT_NAMES,
+                getResources().getStringArray(R.array.widget_accent_names),
                 WidgetSettingsStore.ACCENTS,
                 WidgetSettingsStore.accent(this, widgetId),
                 color -> {
@@ -625,7 +629,7 @@ public class SettingsActivity extends LocalizedActivity {
                     WidgetUpdater.renderAll(this);
                 });
 
-        addSection(widgetOptions, "ФОН");
+        addSection(widgetOptions, getString(R.string.settings_widget_background));
         RadioGroup group = new RadioGroup(this);
         group.setOrientation(RadioGroup.VERTICAL);
         int selected = WidgetSettingsStore.background(this, widgetId);
@@ -633,7 +637,8 @@ public class SettingsActivity extends LocalizedActivity {
             final int index = i;
             RadioButton button = new RadioButton(this);
             button.setId(View.generateViewId());
-            button.setText(WidgetSettingsStore.BACKGROUND_NAMES[i]);
+            button.setText(getResources().getStringArray(
+                    R.array.widget_background_names)[i]);
             button.setTextColor(0xFFE6E9E5);
             button.setButtonTintList(android.content.res.ColorStateList.valueOf(
                     WidgetSettingsStore.BACKGROUNDS[i]));
@@ -654,14 +659,15 @@ public class SettingsActivity extends LocalizedActivity {
         LinearLayout opacityRow = new LinearLayout(this);
         opacityRow.setOrientation(LinearLayout.HORIZONTAL);
         opacityRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        TextView opacityLabel = text("Прозрачность", 13, 0xFFE6E9E5);
+        TextView opacityLabel = text(
+                getString(R.string.settings_opacity), 13, 0xFFE6E9E5);
         opacityRow.addView(opacityLabel);
         SeekBar opacity = new SeekBar(this);
         opacity.setMin(40);
         opacity.setMax(100);
         opacity.setProgress(Math.round(
                 WidgetSettingsStore.opacity(this, widgetId) * 100f));
-        opacity.setContentDescription("Прозрачность фона виджета");
+        opacity.setContentDescription(getString(R.string.settings_widget_background_opacity));
         opacityRow.addView(opacity, new LinearLayout.LayoutParams(
                 0, dp(44), 1f));
         TextView opacityValue = text(
@@ -687,22 +693,22 @@ public class SettingsActivity extends LocalizedActivity {
         widgetOptions.addView(opacityRow);
 
         addWidgetSwitch(
-                "Показывать название",
+                getString(R.string.settings_widget_show_name),
                 WidgetSettingsStore.showName(this, widgetId),
                 widgetId,
                 WidgetSettingsStore::setShowName);
         addWidgetSwitch(
-                "Показывать список игроков",
+                getString(R.string.settings_widget_show_players),
                 WidgetSettingsStore.showPlayers(this, widgetId),
                 widgetId,
                 WidgetSettingsStore::setShowPlayers);
         addWidgetSwitch(
-                "Показывать версию",
+                getString(R.string.settings_widget_show_version),
                 WidgetSettingsStore.showVersion(this, widgetId),
                 widgetId,
                 WidgetSettingsStore::setShowVersion);
         addWidgetSwitch(
-                "Показывать время обновления",
+                getString(R.string.settings_widget_show_updated),
                 WidgetSettingsStore.showUpdated(this, widgetId),
                 widgetId,
                 WidgetSettingsStore::setShowUpdated);

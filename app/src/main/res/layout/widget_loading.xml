@@ -8,6 +8,7 @@
     android:padding="12dp">
 
     <TextView
+        android:id="@+id/loadingText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:fontFamily="sans-serif-medium"
@@ -20,7 +21,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="Загружаю виджет…"
+        android:text="@string/widget_loading"
         android:textColor="@color/widget_soft"
         android:textSize="11sp" />
 </LinearLayout>

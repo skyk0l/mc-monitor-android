@@ -13,6 +13,7 @@ public class PinResultReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        context = AppLanguage.wrap(context);
         int kind = intent.getIntExtra("kind", WidgetStore.KIND_2X2);
         int widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1);
 
@@ -49,7 +50,7 @@ public class PinResultReceiver extends BroadcastReceiver {
             WidgetUpdater.updateWidget(context, widgetId, false);
             WidgetJobService.schedule(context);
             WidgetJobService.requestRefresh(context);
-            Toast.makeText(context, "Виджет добавлен", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.widget_added, Toast.LENGTH_SHORT).show();
         }
     }
 }

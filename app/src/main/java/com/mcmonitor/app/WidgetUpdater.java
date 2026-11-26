@@ -86,7 +86,7 @@ public final class WidgetUpdater {
     }
 
     private static void renderAll(Context context, boolean refreshing) {
-        Context app = context.getApplicationContext();
+        Context app = AppLanguage.wrap(context.getApplicationContext());
         try {
             ensureMapped(app);
         } catch (RuntimeException exception) {
@@ -109,9 +109,22 @@ public final class WidgetUpdater {
 
     public static void showLoading(Context context, int widgetId, int kind) {
         try {
+            context = AppLanguage.wrap(context.getApplicationContext());
             int layout = kind == KIND_GROUP ? R.layout.widget_remote_group
                     : kind == KIND_2X1 ? R.layout.widget_loading_2x1 : R.layout.widget_loading;
             RemoteViews views = new RemoteViews(context.getPackageName(), layout);
+            if (kind == KIND_2X1) {
+                views.setTextViewText(
+                        R.id.loadingTitle, context.getString(R.string.widget_loading_short));
+            } else if (kind != KIND_GROUP) {
+                views.setTextViewText(
+                        R.id.loadingText, context.getString(R.string.widget_loading));
+            } else {
+                views.setTextViewText(
+                        R.id.groupEmpty, context.getString(R.string.widget_group_empty));
+                views.setContentDescription(
+                        R.id.groupRefresh, context.getString(R.string.widget_refresh_description));
+            }
             AppWidgetManager.getInstance(context).updateAppWidget(
                     widgetId, views);
         } catch (RuntimeException exception) {
@@ -161,7 +174,7 @@ public final class WidgetUpdater {
     }
 
     public static void updateWidget(Context context, int widgetId, boolean fetch) {
-        Context app = context.getApplicationContext();
+        Context app = AppLanguage.wrap(context.getApplicationContext());
         WidgetStore.Info info = WidgetStore.get(app, widgetId);
         if (info == null) {
             return;
@@ -189,7 +202,7 @@ public final class WidgetUpdater {
      * не убила процесс на середине запроса.
      */
     public static void refreshAllBlocking(Context context) {
-        Context app = context.getApplicationContext();
+        Context app = AppLanguage.wrap(context.getApplicationContext());
         renderAllRefreshing(app);
 
         Set<String> addresses = new HashSet<>();
@@ -256,6 +269,7 @@ public final class WidgetUpdater {
 
     static RemoteViews build(
             Context context, int widgetId, int kind, String address, boolean refreshing) {
+        context = AppLanguage.wrap(context);
         RemoteViews views = new RemoteViews(context.getPackageName(), layoutFor(kind));
 
         ServerEntry server = ServerStore.findByAddress(context, address);
@@ -288,6 +302,10 @@ public final class WidgetUpdater {
         }
         String customName = WidgetSettingsStore.name(context, widgetId);
         views.setTextViewText(R.id.wName, customName.isEmpty() ? name : customName);
+        views.setContentDescription(
+                R.id.wServerIcon, context.getString(R.string.widget_server_icon_description));
+        views.setContentDescription(
+                R.id.wRefresh, context.getString(R.string.widget_refresh_description));
         views.setTextViewText(R.id.wCount,
                 !known ? "—" : online ? String.valueOf(status.onlineCount) : "—");
         views.setTextColor(R.id.wCount, known && online ? accent : COLOR_TEXT);
@@ -300,19 +318,22 @@ public final class WidgetUpdater {
 
         if (kind != KIND_2X1) {
             views.setTextColor(R.id.wDot, statusColor(status, refreshing));
-            views.setTextViewText(R.id.wStatus, statusText(status, refreshing));
+            views.setTextViewText(R.id.wStatus, statusText(context, status, refreshing));
             views.setTextColor(R.id.wStatus, statusColor(status, refreshing));
             views.setViewVisibility(R.id.wStatus, android.view.View.VISIBLE);
         }
 
         if (kind == KIND_3X3) {
+            views.setTextViewText(
+                    R.id.wNowPlayingLabel, context.getString(R.string.widget_playing_now));
             views.setTextViewText(R.id.wAddress, address);
             views.setTextViewText(R.id.wLastUpdated, updatedText(context, status));
-            views.setTextViewText(R.id.wVersion, versionText(status, server));
+            views.setTextViewText(R.id.wVersion, versionText(context, status, server));
             views.setTextColor(R.id.wPlayersLabel, accent);
-            views.setTextViewText(R.id.wPlayersLabel,
-                    known && online ? "ИГРОКИ · " + status.onlineCount : "ИГРОКИ");
-            views.setTextViewText(R.id.wPlayersEmpty, playersText(status, 9));
+            views.setTextViewText(R.id.wPlayersLabel, known && online
+                    ? context.getString(R.string.widget_players_count_label, status.onlineCount)
+                    : context.getString(R.string.widget_players_label));
+            views.setTextViewText(R.id.wPlayersEmpty, playersText(context, status, 9));
             views.setViewVisibility(R.id.wPlayersLabel,
                     WidgetSettingsStore.showPlayers(context, widgetId)
                             ? android.view.View.VISIBLE : android.view.View.GONE);
@@ -327,7 +348,9 @@ public final class WidgetUpdater {
                             ? android.view.View.VISIBLE : android.view.View.GONE);
         } else if (kind == KIND_2X2) {
             views.setTextColor(R.id.wPlayersLabel, accent);
-            views.setTextViewText(R.id.wPlayersEmpty, playersText(status, 2));
+            views.setTextViewText(
+                    R.id.wPlayersLabel, context.getString(R.string.widget_players_label));
+            views.setTextViewText(R.id.wPlayersEmpty, playersText(context, status, 2));
             views.setViewVisibility(R.id.wPlayersLabel,
                     WidgetSettingsStore.showPlayers(context, widgetId)
                             ? android.view.View.VISIBLE : android.view.View.GONE);
@@ -356,6 +379,7 @@ public final class WidgetUpdater {
     }
 
     private static RemoteViews buildGroup(Context context, int widgetId, String groupId) {
+        context = AppLanguage.wrap(context);
         RemoteViews views = new RemoteViews(
                 context.getPackageName(), R.layout.widget_remote_group);
         int backgroundIndex = WidgetSettingsStore.background(context, widgetId);
@@ -379,6 +403,12 @@ public final class WidgetUpdater {
                 R.id.groupTitle,
                 customName.isEmpty() ? (groupId == null ? "" : groupId) : customName);
         views.setTextColor(R.id.groupRefresh, WidgetSettingsStore.accent(context, widgetId));
+        views.setTextViewText(
+                R.id.groupEmpty, context.getString(R.string.widget_group_empty));
+        views.setContentDescription(
+                R.id.groupRefresh, context.getString(R.string.widget_refresh_description));
+        views.setContentDescription(
+                R.id.groupRefresh, context.getString(R.string.widget_refresh_description));
         views.setViewVisibility(
                 R.id.groupTitle,
                 WidgetSettingsStore.showName(context, widgetId)
@@ -420,17 +450,17 @@ public final class WidgetUpdater {
         return null;
     }
 
-    private static String statusText(ServerStatus status, boolean refreshing) {
+    private static String statusText(Context context, ServerStatus status, boolean refreshing) {
         if (refreshing) {
-            return "обновляю";
+            return context.getString(R.string.widget_status_refreshing);
         }
         if (status == null) {
-            return "нет данных";
+            return context.getString(R.string.main_no_data);
         }
         if (!status.hasData) {
-            return "нет связи";
+            return context.getString(R.string.main_no_connection);
         }
-        return status.online ? "онлайн" : "офлайн";
+        return context.getString(status.online ? R.string.main_online : R.string.main_offline);
     }
 
     private static int statusColor(ServerStatus status, boolean refreshing) {
@@ -445,10 +475,11 @@ public final class WidgetUpdater {
 
     private static String updatedText(Context context, ServerStatus status) {
         if (status == null || status.updatedAt <= 0L) {
-            return "ещё не проверяли";
+            return context.getString(R.string.widget_not_checked);
         }
-        return "обновлено "
-                + DateFormat.getTimeFormat(context).format(new Date(status.updatedAt));
+        return context.getString(
+                R.string.widget_updated_at,
+                DateFormat.getTimeFormat(context).format(new Date(status.updatedAt)));
     }
 
     private static Bitmap decodeServerIcon(ServerStatus status) {
@@ -464,18 +495,20 @@ public final class WidgetUpdater {
         }
     }
 
-    private static String versionText(ServerStatus status, ServerEntry server) {
+    private static String versionText(Context context, ServerStatus status, ServerEntry server) {
         if (status == null) {
-            return "ещё не проверяли";
+            return context.getString(R.string.widget_not_checked);
         }
         if (!status.hasData) {
-            return status.error == null || status.error.isEmpty() ? "нет связи" : status.error;
+            return status.error == null || status.error.isEmpty()
+                    ? context.getString(R.string.main_no_connection) : status.error;
         }
         if (!status.online) {
-            return "сервер офлайн";
+            return context.getString(R.string.widget_server_offline);
         }
         String version = status.version == null ? "" : status.version.trim();
-        String edition = server != null && server.isBedrock() ? "Bedrock · " : "";
+        String edition = server != null && server.isBedrock()
+                ? context.getString(R.string.main_bedrock_prefix) : "";
         if (server != null && !version.isEmpty()) {
             String name = server.displayName();
             if (!name.isEmpty() && version.regionMatches(true, 0, name, 0, name.length())) {
@@ -485,27 +518,29 @@ public final class WidgetUpdater {
                 }
             }
         }
-        return version.isEmpty() ? edition + "онлайн" : edition + version;
+        return version.isEmpty()
+                ? edition + context.getString(R.string.main_online) : edition + version;
     }
 
-    private static String emptyText(ServerStatus status) {
+    private static String emptyText(Context context, ServerStatus status) {
         if (status == null) {
-            return "Ники появятся после ответа сервера";
+            return context.getString(R.string.widget_players_loading);
         }
         if (!status.hasData) {
-            return "Нет связи с сервером";
+            return context.getString(R.string.main_server_unreachable);
         }
         if (!status.online) {
-            return "Сервер офлайн";
+            return context.getString(R.string.main_server_offline);
         }
         if (!status.players.isEmpty()) {
             return "";
         }
-        return status.onlineCount > 0 ? "Список игроков скрыт" : "На сервере никого нет";
+        return context.getString(status.onlineCount > 0
+                ? R.string.main_server_hides_players : R.string.main_no_players_online);
     }
 
-    private static String playersText(ServerStatus status, int maxPlayers) {
-        String empty = emptyText(status);
+    private static String playersText(Context context, ServerStatus status, int maxPlayers) {
+        String empty = emptyText(context, status);
         if (status == null || !status.hasData || !status.online || status.players.isEmpty()) {
             return empty;
         }
@@ -518,7 +553,8 @@ public final class WidgetUpdater {
             builder.append("• ").append(status.players.get(i));
         }
         if (status.players.size() > count) {
-            builder.append("\nи ещё ").append(status.players.size() - count);
+            builder.append('\n').append(context.getString(
+                    R.string.widget_more_players, status.players.size() - count));
         }
         return builder.toString();
     }

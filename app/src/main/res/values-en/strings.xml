@@ -6,6 +6,307 @@
     <string name="language_russian">Russian</string>
     <string name="language_english">English</string>
     <string name="language_restart_note">The app will restart after changing the language.</string>
+    <string name="settings_back">‹   Back</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_subtitle">App and widget appearance</string>
+    <string name="settings_app_color">APP ACCENT COLOR</string>
+    <string name="settings_notifications">NOTIFICATIONS</string>
+    <string name="settings_notification_window">Priority-player notifications are delivered only during the selected hours.</string>
+    <string name="settings_dnd_mode">Do Not Disturb</string>
+    <string name="settings_servers">SERVER LIST</string>
+    <string name="settings_pinned_order_hint">Pinned servers are always shown first. To reorder manually, press and drag a server card.</string>
+    <string name="settings_sort_title">Server sorting</string>
+    <string name="settings_sort_prefix">Sort: %1$s</string>
+    <string name="settings_sort_manual">Manual</string>
+    <string name="settings_sort_name">By name</string>
+    <string name="settings_sort_online">By online players</string>
+    <string name="settings_sort_ping">By ping (response time)</string>
+    <string name="settings_sort_date">By date added</string>
+    <string name="settings_cancel">Cancel</string>
+    <string name="settings_widgets">WIDGETS</string>
+    <string name="settings_widget_hint">Each widget can have its own settings.</string>
+    <string name="settings_account_hint">Account and sync options are in the profile menu.</string>
+    <string name="settings_updates">UPDATES</string>
+    <string name="settings_updates_hint">The APK is downloaded from the official GitHub release. Android will ask you to confirm installation.</string>
+    <string name="settings_check_updates">Check for updates</string>
+    <string name="settings_dnd_off">Turn off</string>
+    <string name="settings_dnd_one_hour">For 1 hour</string>
+    <string name="settings_dnd_three_hours">For 3 hours</string>
+    <string name="settings_dnd_eight_hours">For 8 hours</string>
+    <string name="settings_dnd_until_disabled">Until I turn it off</string>
+    <string name="settings_dnd_title">Do Not Disturb</string>
+    <string name="settings_notification_start">Notifications from %1$s</string>
+    <string name="settings_notification_end">Notifications until %1$s</string>
+    <string name="settings_dnd_active_manual">Do Not Disturb is on until you turn it off.</string>
+    <string name="settings_dnd_active_until">Do Not Disturb is on until %1$s.</string>
+    <string name="settings_dnd_disabled">Do Not Disturb is off.</string>
+    <string name="settings_missing_apk">Downloaded APK not found. Check for updates again.</string>
+    <string name="settings_checking_updates">Checking GitHub Releases…</string>
+    <string name="settings_latest_version">You have the latest version.</string>
+    <string name="settings_update_available">Version %1$s is available.</string>
+    <string name="settings_update_dialog_title">Update available</string>
+    <string name="settings_later">Later</string>
+    <string name="settings_download_install">Download and install</string>
+    <string name="settings_update_check_failed">Could not check for updates: %1$s</string>
+    <string name="settings_downloading_verify">Downloading and verifying APK…</string>
+    <string name="settings_downloading_progress">Downloading APK… %1$d%%</string>
+    <string name="settings_apk_verified">APK verified. Opening the Android installer…</string>
+    <string name="settings_download_failed">Could not download update: %1$s</string>
+    <string name="settings_allow_install">Allow MC Monitor to install apps, then return here.</string>
+    <string name="settings_allow_source_install">Allow installs from this source in system settings, then try again.</string>
+    <string name="settings_confirm_install">Wait for Android to prompt you and confirm the update.</string>
+    <string name="settings_installer_failed">Could not open installer: %1$s</string>
+    <string name="settings_widget_default">Default settings</string>
+    <string name="settings_widget_group">Group %1$s</string>
+    <string name="settings_widget_name_hint">Custom widget name</string>
+    <string name="settings_widget_accent">ACCENT COLOR</string>
+    <string name="settings_widget_background">BACKGROUND</string>
+    <string name="settings_opacity">Opacity</string>
+    <string name="settings_widget_background_opacity">Widget background opacity</string>
+    <string name="settings_widget_show_name">Show name</string>
+    <string name="settings_widget_show_players">Show player list</string>
+    <string name="settings_widget_show_version">Show version</string>
+    <string name="settings_widget_show_updated">Show last update time</string>
+    <string name="profile_back">‹   Back</string>
+    <string name="profile_title">Profile</string>
+    <string name="profile_player_title">Player profile</string>
+    <string name="profile_identity">%1$s  @%2$s</string>
+    <string name="profile_social_counts">%1$s  ·  %2$s  ·  %3$s%4$s</string>
+    <string name="profile_edit">Edit profile</string>
+    <string name="profile_followers">Followers</string>
+    <string name="profile_subscriptions">Following</string>
+    <string name="profile_friends">Friends</string>
+    <string name="profile_servers">Servers</string>
+    <string name="profile_follow">Follow</string>
+    <string name="profile_unfollow">Unfollow</string>
+    <string name="profile_edit_privacy">Edit profile and privacy</string>
+    <string name="profile_change_avatar">Change avatar</string>
+    <string name="profile_display_name_hint">Display name</string>
+    <string name="profile_bio_hint">About me</string>
+    <string name="profile_share_servers">Show my servers</string>
+    <string name="profile_share_followers">Show followers</string>
+    <string name="profile_share_friends">Show friends</string>
+    <string name="profile_share_subscriptions">Show followed users</string>
+    <string name="profile_save">Save profile</string>
+    <string name="profile_hide_editor">Hide editor</string>
+    <string name="profile_loading">Loading profile…</string>
+    <string name="profile_hidden_followers">followers are private</string>
+    <string name="profile_hidden_subscriptions">following is private</string>
+    <string name="profile_hidden_friends">friends are private</string>
+    <string name="profile_friend_badge">  ·  Friends</string>
+    <string name="profile_loading_wait">Profile is still loading.</string>
+    <string name="profile_servers_hidden">The profile owner has hidden their server list.</string>
+    <string name="profile_list_hidden">The profile owner has hidden this list.</string>
+    <string name="profile_loading_list">Loading list…</string>
+    <string name="profile_empty">Nothing here yet.</string>
+    <string name="profile_friend_suffix">  ·  Friend</string>
+    <string name="profile_open">Open</string>
+    <string name="profile_no_public_servers">No public servers.</string>
+    <string name="profile_saving">Saving profile…</string>
+    <string name="profile_saved">Profile saved.</string>
+    <string name="profile_updating_follow">Updating follow…</string>
+    <string name="profile_broken_avatar">The avatar image is corrupted.</string>
+    <string name="profile_image_open_failed">Could not open the selected image.</string>
+    <string name="profile_avatar_too_large">The image is too large for an avatar.</string>
+    <string name="profile_avatar_ready">Avatar is ready to save.</string>
+    <string name="profile_load_failed">Could not load profile data.</string>
+    <string name="main_subtitle">JAVA + BEDROCK  ·  SERVER MONITOR</string>
+    <string name="main_my_servers">MY SERVERS</string>
+    <string name="main_add_server">＋  Add server</string>
+    <string name="main_profile_and_account">Profile and account</string>
+    <string name="main_settings_description">Settings</string>
+    <string name="main_refresh">Refresh</string>
+    <string name="main_search_hint">Search servers</string>
+    <string name="main_notifications_enabled">Priority-player notifications are enabled.</string>
+    <string name="main_notifications_disabled">Notifications are disabled</string>
+    <string name="main_enable_notifications_message">Allow notifications for MC Monitor in Android settings to receive alerts when priority players join or leave.</string>
+    <string name="main_later">Later</string>
+    <string name="main_open_settings">Open settings</string>
+    <string name="main_search_no_results">No results found</string>
+    <string name="main_empty_title">Nothing here yet</string>
+    <string name="main_search_hint_empty">Change your query — results update as you type</string>
+    <string name="main_empty_hint">Add a Java or Bedrock server to see its player count and names.</string>
+    <string name="main_online_summary">%1$d online</string>
+    <string name="main_server_summary">%1$s · %2$d online</string>
+    <string name="main_server_summary_initial">0 servers · 0 online</string>
+    <string name="main_checking">checking</string>
+    <string name="main_no_connection">no connection</string>
+    <string name="main_online">online</string>
+    <string name="main_offline">offline</string>
+    <string name="main_hidden_player_list">player list hidden</string>
+    <string name="main_empty_players">empty</string>
+    <string name="main_players_count">%1$d of %2$d</string>
+    <string name="main_more_players">+%1$d more</string>
+    <string name="main_loading_players">Loading players…</string>
+    <string name="main_server_unreachable">Could not connect to server</string>
+    <string name="main_server_offline">Server is currently offline</string>
+    <string name="main_server_hides_players">Server does not show its player list</string>
+    <string name="main_no_players_online">No players are online</string>
+    <string name="main_loading_status">loading status…</string>
+    <string name="main_no_data">no data</string>
+    <string name="main_server_not_responding">Server is not responding</string>
+    <string name="main_bedrock_prefix">Bedrock · </string>
+    <string name="main_close_search">Close search</string>
+    <string name="main_search_servers">Search servers</string>
+    <string name="main_community_search_min">Enter at least 2 characters to search the community.</string>
+    <string name="main_community_search_signin">Sign in to search community servers and players.</string>
+    <string name="main_profile_signin_description">Profile: sign in or create an account</string>
+    <string name="main_profile_description">Profile %1$s</string>
+    <string name="main_login">Sign in</string>
+    <string name="main_create_account">Create account</string>
+    <string name="main_account">Account</string>
+    <string name="main_close">Close</string>
+    <string name="main_profile_menu_search">Search players and servers</string>
+    <string name="main_my_subscriptions">My subscriptions</string>
+    <string name="main_sync_now">Sync now</string>
+    <string name="main_logout">Sign out</string>
+    <string name="main_logout_title">Sign out?</string>
+    <string name="main_logout_message">Your local server list will remain on this device.</string>
+    <string name="main_logout_button">Sign out</string>
+    <string name="main_logged_out">You have signed out.</string>
+    <string name="main_display_name_hint">Display name</string>
+    <string name="main_bio_hint">About me (up to 160 characters)</string>
+    <string name="main_share_server_addresses">Show my server addresses publicly</string>
+    <string name="main_private_by_default">Off by default. When enabled, signed-in users can see your addresses in search.</string>
+    <string name="main_choose_avatar">Choose avatar</string>
+    <string name="main_loading_profile">Loading profile…</string>
+    <string name="main_my_profile">My profile</string>
+    <string name="main_save">Save</string>
+    <string name="main_avatar_not_set">No avatar is set.</string>
+    <string name="main_avatar_set">Current avatar is set.</string>
+    <string name="main_avatar_load_failed">Could not load avatar: %1$s</string>
+    <string name="main_saving_profile">Saving profile…</string>
+    <string name="main_profile_saved">Profile saved.</string>
+    <string name="main_avatar_too_large">The image is too large for an avatar.</string>
+    <string name="main_avatar_ready">Avatar is ready to upload.</string>
+    <string name="main_image_open_failed">Could not open image: %1$s</string>
+    <string name="main_selected_file_not_image">The selected file is not an image.</string>
+    <string name="main_image_read_failed">Could not read image.</string>
+    <string name="main_no_cloud_connection">Could not connect to cloud service.</string>
+    <string name="main_subscription_search">Following</string>
+    <string name="main_community_players">Players</string>
+    <string name="main_community_servers">Servers</string>
+    <string name="main_community_tab_subscriptions">Following</string>
+    <string name="main_community_search_hint">Nickname, name, or server (2+ characters)</string>
+    <string name="main_community_title">Community</string>
+    <string name="main_enter_two_characters">Enter at least two characters to search.</string>
+    <string name="main_searching">Searching…</string>
+    <string name="main_not_following_anyone">You are not following anyone yet.</string>
+    <string name="main_nothing_found">No results found.</string>
+    <string name="main_public_servers_not_found">No public servers found.</string>
+    <string name="main_add">Add</string>
+    <string name="main_server_already_added">This server is already in your list.</string>
+    <string name="main_server_added">Server added.</string>
+    <string name="main_servers_synced">%1$d servers synchronized</string>
+    <string name="server_action_edit">Edit</string>
+    <string name="server_action_add_widget">Add widget</string>
+    <string name="server_action_priority_players">Priority players…</string>
+    <string name="server_action_add_group">Add to group…</string>
+    <string name="server_action_group">Group: %1$s</string>
+    <string name="server_action_unpin">Unpin server</string>
+    <string name="server_action_pin">Pin server</string>
+    <string name="server_action_unpin_group">Unpin group</string>
+    <string name="server_action_pin_group">Pin group</string>
+    <string name="server_action_delete">Delete</string>
+    <string name="priority_examples">For example:\nNotch\nJeb_\nDinnerbone</string>
+    <string name="priority_dialog_title">Priority players · %1$s</string>
+    <string name="priority_dialog_message">You will only receive join and leave alerts for these names.</string>
+    <string name="priority_invalid_nickname">Names must be up to 32 characters with no spaces</string>
+    <string name="priority_limit_reached">You can track up to 50 names</string>
+    <string name="priority_disabled">Player tracking is disabled</string>
+    <string name="priority_saved">Priority names saved and syncing</string>
+    <string name="group_none">No group</string>
+    <string name="group_create_option">＋ Create a new group</string>
+    <string name="group_dialog_title">Server group</string>
+    <string name="group_name_hint">Group name</string>
+    <string name="group_new_title">New group</string>
+    <string name="group_create">Create</string>
+    <string name="group_name_error">Name must be 1–60 characters</string>
+    <string name="group_server_removed">Server removed from group</string>
+    <string name="group_server_added">Server added to group %1$s</string>
+    <string name="server_address_hint_java">mc.example.com or host:25565</string>
+    <string name="server_address_hint_bedrock">mc.example.com or host:19132</string>
+    <string name="server_address_label_bedrock">Bedrock server address</string>
+    <string name="server_address_label_java">Server IP</string>
+    <string name="server_edition_label">Minecraft edition</string>
+    <string name="server_name_label">Name</string>
+    <string name="server_name_from_motd_hint">Leave empty to use the MOTD</string>
+    <string name="server_icon_description">Server icon</string>
+    <string name="server_menu_description">Server menu</string>
+    <string-array name="server_protocol_names">
+        <item>Java Edition</item>
+        <item>Bedrock Edition</item>
+    </string-array>
+    <string name="server_protocol_hint_bedrock">Bedrock Edition · default port 19132</string>
+    <string name="server_protocol_hint_java">Java Edition · default port 25565</string>
+    <string name="server_new_title">New server</string>
+    <string name="server_edit_title">Edit server</string>
+    <string name="server_enter_address">Enter a server IP or domain</string>
+    <string name="server_address_too_long">Address is too long</string>
+    <string name="server_duplicate">This server is already in your list</string>
+    <string name="server_delete_title">Delete server?</string>
+    <string name="server_delete_message">“%1$s” will be removed from your list.</string>
+    <string name="widget_server_title">Widget for “%1$s”</string>
+    <string name="widget_how_to_add_title">How to add a widget</string>
+    <string name="widget_how_to_add_message">Long-press an empty area on your home screen → Widgets → find MC Monitor → choose 2×1, 2×2, or 3×3.\n\nTo show a specific server, it is easiest to add a widget from that server’s ⋮ menu.</string>
+    <string name="widget_understood">Got it</string>
+    <string-array name="widget_sizes">
+        <item>2 × 2 · compact</item>
+        <item>2 × 1 · mini widget</item>
+        <item>3 × 3 · with player list</item>
+    </string-array>
+    <string-array name="main_account_actions">
+        <item>Profile</item>
+        <item>Search players and servers</item>
+        <item>My subscriptions</item>
+        <item>Sync now</item>
+        <item>Sign out</item>
+    </string-array>
+    <string-array name="main_community_tabs">
+        <item>Players</item>
+        <item>Servers</item>
+        <item>Following</item>
+    </string-array>
+    <plurals name="main_server_count">
+        <item quantity="one">%d server</item>
+        <item quantity="other">%d servers</item>
+    </plurals>
+    <plurals name="main_profile_server_count">
+        <item quantity="one">%d server in your list</item>
+        <item quantity="other">%d servers in your list</item>
+    </plurals>
+    <plurals name="profile_follower_count">
+        <item quantity="one">%d follower</item>
+        <item quantity="other">%d followers</item>
+    </plurals>
+    <plurals name="profile_subscription_count">
+        <item quantity="one">%d following</item>
+        <item quantity="other">%d following</item>
+    </plurals>
+    <plurals name="profile_friend_count">
+        <item quantity="one">%d friend</item>
+        <item quantity="other">%d friends</item>
+    </plurals>
+    <string-array name="app_accent_names">
+        <item>Mint</item>
+        <item>Blue</item>
+        <item>Lavender</item>
+        <item>Pink</item>
+        <item>Amber</item>
+    </string-array>
+    <string-array name="widget_accent_names">
+        <item>Mint</item>
+        <item>Blue</item>
+        <item>Lavender</item>
+        <item>Pink</item>
+        <item>Amber</item>
+    </string-array>
+    <string-array name="widget_background_names">
+        <item>Graphite</item>
+        <item>Blue</item>
+        <item>Purple</item>
+        <item>Warm</item>
+    </string-array>
     <string name="account_button">Account</string>
     <string name="account_recovery_note">Without an email, a forgotten password cannot be recovered.</string>
     <string name="widget_desc_2x2">Compact widget: server status and players</string>
@@ -77,4 +378,24 @@
     <string name="widget_group_description">A widget that switches through the servers in a selected group.</string>
     <string name="widget_group_empty">Add servers to a group to browse them here.</string>
     <string name="widget_refresh_description">Refresh server</string>
+    <string name="widget_status_refreshing">refreshing</string>
+    <string name="widget_not_checked">not checked yet</string>
+    <string name="widget_updated_at">updated %1$s</string>
+    <string name="widget_server_offline">server offline</string>
+    <string name="widget_more_players">and %1$d more</string>
+    <string name="widget_players_count_label">PLAYERS · %1$d</string>
+    <string name="widget_server_icon_description">Server icon</string>
+    <string name="widget_playing_now">PLAYING NOW</string>
+    <string name="widget_version_loading">Version appears when the server responds</string>
+    <string name="widget_address_placeholder">server address</string>
+    <string name="widget_loading">Loading widget…</string>
+    <string name="widget_loading_short">MC Monitor · loading…</string>
+    <string name="notification_priority_channel">Priority players</string>
+    <string name="notification_player_joined">%1$s joined</string>
+    <string name="notification_player_left">%1$s left</string>
+    <string name="notification_players_changed">%1$s · online: %2$d</string>
+    <string name="update_installed">Update installed.</string>
+    <string name="update_install_failed">Could not install update: %1$s</string>
+    <string name="update_install_failed_generic">Could not install update.</string>
+    <string name="widget_added">Widget added</string>
 </resources>

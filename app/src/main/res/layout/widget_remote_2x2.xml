@@ -26,7 +26,7 @@
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:background="@drawable/bg_server_icon"
-            android:contentDescription="Иконка сервера"
+            android:contentDescription="@string/widget_server_icon_description"
             android:padding="2dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_server_fallback" />
@@ -50,7 +50,7 @@
             android:layout_width="26dp"
             android:layout_height="26dp"
             android:background="@drawable/bg_widget_button"
-            android:contentDescription="Обновить"
+            android:contentDescription="@string/widget_refresh_description"
             android:gravity="center"
             android:text="↻"
             android:textColor="@color/widget_accent"
@@ -98,7 +98,7 @@
             android:paddingTop="3dp"
             android:paddingEnd="6dp"
             android:paddingBottom="3dp"
-            android:text="нет данных"
+            android:text="@string/main_no_data"
             android:textColor="@color/widget_waiting"
             android:textSize="8sp"
             android:textStyle="bold" />

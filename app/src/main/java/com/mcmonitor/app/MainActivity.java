@@ -160,7 +160,7 @@ public class MainActivity extends LocalizedActivity {
         emptyState = findViewById(R.id.emptyState);
         scroll = findViewById(R.id.scroll);
         subtitle = findViewById(R.id.subtitle);
-        subtitle.setText("JAVA + BEDROCK  ·  МОНИТОРИНГ СЕРВЕРОВ");
+        subtitle.setText(R.string.main_subtitle);
         serverSummaryText = findViewById(R.id.serverSummaryText);
         accountButton = findViewById(R.id.accountButton);
         accountButton.setOnClickListener(v -> showAccountMenu());
@@ -279,7 +279,7 @@ public class MainActivity extends LocalizedActivity {
             if (arePriorityNotificationsEnabled()) {
                 Toast.makeText(
                         this,
-                        "Уведомления о приоритетных игроках включены.",
+                        R.string.main_notifications_enabled,
                         Toast.LENGTH_SHORT).show();
                 WidgetJobService.schedule(this);
                 WidgetJobService.requestRefresh(this);
@@ -293,11 +293,10 @@ public class MainActivity extends LocalizedActivity {
         getSharedPreferences(APP_SETTINGS, MODE_PRIVATE)
                 .edit().putBoolean(NOTIFICATION_SETTINGS_PROMPTED, true).apply();
         new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("Уведомления отключены")
-                .setMessage("Разреши уведомления для MC Monitor в настройках Android, "
-                        + "чтобы получать оповещения о входе и выходе приоритетных игроков.")
-                .setNegativeButton("Позже", null)
-                .setPositiveButton("Открыть настройки", (dialog, which) -> {
+                .setTitle(R.string.main_notifications_disabled)
+                .setMessage(R.string.main_enable_notifications_message)
+                .setNegativeButton(R.string.main_later, null)
+                .setPositiveButton(R.string.main_open_settings, (dialog, which) -> {
                     Intent settings = new Intent(
                             android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                             .putExtra(
@@ -357,10 +356,10 @@ public class MainActivity extends LocalizedActivity {
         TextView emptyMessage = emptyState.findViewById(R.id.emptyMessage);
         boolean noServers = entries.isEmpty();
         boolean noMatches = !noServers && visibleCount == 0;
-        emptyTitle.setText(noMatches ? "Ничего не найдено" : "Пока пусто");
+        emptyTitle.setText(noMatches
+                ? R.string.main_search_no_results : R.string.main_empty_title);
         emptyMessage.setText(noMatches
-                ? "Измени запрос — список обновляется по мере ввода"
-                : "Добавь сервер Java или Bedrock —\nпокажем онлайн и ники игроков");
+                ? R.string.main_search_hint_empty : R.string.main_empty_hint);
         emptyState.setVisibility(noServers || noMatches ? View.VISIBLE : View.GONE);
         updateServerSummary(entries);
     }
@@ -451,8 +450,10 @@ public class MainActivity extends LocalizedActivity {
                 online++;
             }
         }
-        serverSummaryText.setText(entries.size() + " " + pluralServers(entries.size())
-                + " · " + online + " онлайн");
+        String serverCount = getResources().getQuantityString(
+                R.plurals.main_server_count, entries.size(), entries.size());
+        serverSummaryText.setText(getString(
+                R.string.main_server_summary, serverCount, online));
     }
 
     private void showCatalogDialog() {
@@ -1001,9 +1002,10 @@ public class MainActivity extends LocalizedActivity {
         TextView statusLabel = card.findViewById(R.id.statusLabel);
         statusLabel.setTextColor(accent);
         if (!known) {
-            statusLabel.setText(loading ? "проверяю" : "нет связи");
+            statusLabel.setText(loading
+                    ? R.string.main_checking : R.string.main_no_connection);
         } else {
-            statusLabel.setText(online ? "онлайн" : "офлайн");
+            statusLabel.setText(online ? R.string.main_online : R.string.main_offline);
         }
 
         TextView version = card.findViewById(R.id.versionLine);
@@ -1016,9 +1018,11 @@ public class MainActivity extends LocalizedActivity {
         } else if (!online) {
             hint.setText("—");
         } else if (status.players.isEmpty()) {
-            hint.setText(status.onlineCount > 0 ? "список скрыт" : "пусто");
+            hint.setText(status.onlineCount > 0
+                    ? R.string.main_hidden_player_list : R.string.main_empty_players);
         } else {
-            hint.setText(status.players.size() + " из " + status.onlineCount);
+            hint.setText(getString(
+                    R.string.main_players_count, status.players.size(), status.onlineCount));
         }
 
         FlowLayout flow = card.findViewById(R.id.playersFlow);
@@ -1031,21 +1035,22 @@ public class MainActivity extends LocalizedActivity {
                 addPlayerChip(flow, status.players.get(i), i);
             }
             if (status.players.size() > shown) {
-                addMoreChip(flow, "+" + (status.players.size() - shown) + " ещё");
+                addMoreChip(flow, getString(
+                        R.string.main_more_players, status.players.size() - shown));
             }
         }
 
         TextView empty = card.findViewById(R.id.playersEmpty);
         if (!known) {
-            empty.setText(loading ? "Тяну список игроков…" : "Нет связи с сервером");
+            empty.setText(loading
+                    ? R.string.main_loading_players : R.string.main_server_unreachable);
             empty.setVisibility(View.VISIBLE);
         } else if (!online) {
-            empty.setText("Сервер сейчас офлайн");
+            empty.setText(R.string.main_server_offline);
             empty.setVisibility(View.VISIBLE);
         } else if (status.players.isEmpty()) {
             empty.setText(status.onlineCount > 0
-                    ? "Сервер не показывает список игроков"
-                    : "На сервере никого нет");
+                    ? R.string.main_server_hides_players : R.string.main_no_players_online);
             empty.setVisibility(View.VISIBLE);
         } else {
             empty.setVisibility(View.GONE);
@@ -1054,17 +1059,19 @@ public class MainActivity extends LocalizedActivity {
 
     private String versionLine(ServerStatus status, ServerEntry entry, boolean loading) {
         if (status == null) {
-            return loading ? "тяну статус…" : "нет данных";
+            return getString(loading
+                    ? R.string.main_loading_status : R.string.main_no_data);
         }
         if (!status.hasData) {
-            return status.error == null || status.error.isEmpty() ? "нет связи" : status.error;
+            return status.error == null || status.error.isEmpty()
+                    ? getString(R.string.main_no_connection) : status.error;
         }
         if (!status.online) {
-            return "Сервер не отвечает";
+            return getString(R.string.main_server_not_responding);
         }
 
         String version = status.version == null ? "" : status.version.trim();
-        String edition = entry.isBedrock() ? "Bedrock · " : "";
+        String edition = entry.isBedrock() ? getString(R.string.main_bedrock_prefix) : "";
         String name = entry.displayName();
         if (!version.isEmpty() && !name.isEmpty()
                 && version.regionMatches(true, 0, name, 0, name.length())) {
@@ -1173,7 +1180,7 @@ public class MainActivity extends LocalizedActivity {
             searchInput.setAlpha(0f);
             searchInput.animate().alpha(1f).setDuration(180).start();
             searchInput.requestFocus();
-            toggle.setContentDescription("Закрыть поиск");
+            toggle.setContentDescription(getString(R.string.main_close_search));
             InputMethodManager input = (InputMethodManager) getSystemService(
                     Context.INPUT_METHOD_SERVICE);
             if (input != null) {
@@ -1192,14 +1199,14 @@ public class MainActivity extends LocalizedActivity {
         searchInput.setVisibility(View.GONE);
         searchInput.setAlpha(1f);
         headerActionsSpacer.setVisibility(View.VISIBLE);
-        toggle.setContentDescription("Поиск серверов");
+        toggle.setContentDescription(getString(R.string.main_search_servers));
         buildCards(false);
     }
 
     private void openCommunitySearch() {
         String query = searchInput.getText().toString().trim();
         if (query.length() < 2) {
-            Toast.makeText(this, "Для поиска сообщества введи хотя бы 2 символа.",
+            Toast.makeText(this, R.string.main_community_search_min,
                     Toast.LENGTH_SHORT).show();
             return;
         }
@@ -1210,7 +1217,7 @@ public class MainActivity extends LocalizedActivity {
         }
         AccountSession session = AccountSessionStore.load(this);
         if (session == null) {
-            Toast.makeText(this, "Войди в аккаунт, чтобы искать серверы и игроков сообщества.",
+            Toast.makeText(this, R.string.main_community_search_signin,
                     Toast.LENGTH_LONG).show();
             showAccountMenu();
             return;
@@ -1223,8 +1230,8 @@ public class MainActivity extends LocalizedActivity {
         ImageButton button = (ImageButton) accountButton;
         button.setClipToOutline(true);
         accountButton.setContentDescription(session == null
-                ? "Профиль: войти или создать аккаунт"
-                : "Профиль " + session.username);
+                ? getString(R.string.main_profile_signin_description)
+                : getString(R.string.main_profile_description, session.username));
         accountButton.setSelected(session != null);
         if (session == null) {
             button.setImageResource(R.drawable.ic_profile);
@@ -1309,22 +1316,19 @@ public class MainActivity extends LocalizedActivity {
     private void showAccountMenu() {
         AccountSession session = AccountSessionStore.load(this);
         if (session == null) {
-            String[] options = {"Войти", "Создать аккаунт"};
+            String[] options = {
+                    getString(R.string.main_login),
+                    getString(R.string.main_create_account)
+            };
             new AlertDialog.Builder(this, R.style.DialogTheme)
-                    .setTitle("Аккаунт")
+                    .setTitle(R.string.main_account)
                     .setItems(options, (dialog, which) -> showAccountForm(which == 1))
-                    .setNegativeButton("Закрыть", null)
+                    .setNegativeButton(R.string.main_close, null)
                     .show();
             return;
         }
 
-        String[] options = {
-                "Профиль",
-                "Поиск игроков и серверов",
-                "Мои подписки",
-                "Синхронизировать сейчас",
-                "Выйти из аккаунта"
-        };
+        String[] options = getResources().getStringArray(R.array.main_account_actions);
         new AlertDialog.Builder(this, R.style.DialogTheme)
                 .setTitle(session.username)
                 .setItems(options, (dialog, which) -> {
@@ -1338,21 +1342,21 @@ public class MainActivity extends LocalizedActivity {
                         requestCloudSync(false);
                     } else {
                         new AlertDialog.Builder(this, R.style.DialogTheme)
-                                .setTitle("Выйти из аккаунта?")
-                                .setMessage("Локальный список серверов останется на устройстве.")
-                                .setPositiveButton("Выйти", (confirm, action) -> {
+                                .setTitle(R.string.main_logout_title)
+                                .setMessage(R.string.main_logout_message)
+                                .setPositiveButton(R.string.main_logout_button, (confirm, action) -> {
                                     AccountSessionStore.clearSession(this);
                                     WidgetJobService.schedule(this);
                                     WidgetJobService.requestRefresh(this);
                                     updateAccountButton();
-                                    Toast.makeText(this, "Вы вышли из аккаунта.", Toast.LENGTH_SHORT)
+                                    Toast.makeText(this, R.string.main_logged_out, Toast.LENGTH_SHORT)
                                             .show();
                                 })
-                                .setNegativeButton("Отмена", null)
+                                .setNegativeButton(R.string.account_cancel, null)
                                 .show();
                     }
                 })
-                .setNegativeButton("Закрыть", null)
+                .setNegativeButton(R.string.main_close, null)
                 .show();
     }
 
@@ -1363,8 +1367,10 @@ public class MainActivity extends LocalizedActivity {
         form.setPadding(padding, dp(8), padding, 0);
 
         TextView username = new TextView(this);
+        int serverCount = ServerStore.load(this).size();
         username.setText("@" + session.username + "  ·  "
-                + ServerStore.load(this).size() + " серверов в вашем списке");
+                + getResources().getQuantityString(
+                        R.plurals.main_profile_server_count, serverCount, serverCount));
         username.setTextColor(getColor(R.color.dim));
         form.addView(username);
 
@@ -1376,29 +1382,28 @@ public class MainActivity extends LocalizedActivity {
 
         profileDisplayName = new EditText(this);
         profileDisplayName.setSingleLine(true);
-        profileDisplayName.setHint("Отображаемое имя");
+        profileDisplayName.setHint(R.string.main_display_name_hint);
         profileDisplayName.setMaxLines(1);
         form.addView(profileDisplayName);
 
         profileBio = new EditText(this);
-        profileBio.setHint("О себе (до 160 символов)");
+        profileBio.setHint(R.string.main_bio_hint);
         profileBio.setMinLines(2);
         profileBio.setMaxLines(4);
         form.addView(profileBio);
 
         profileShareServers = new CheckBox(this);
-        profileShareServers.setText("Публично показывать адреса моих серверов");
+        profileShareServers.setText(R.string.main_share_server_addresses);
         profileShareServers.setTextColor(getColor(R.color.soft));
         form.addView(profileShareServers);
         TextView privacyNote = new TextView(this);
-        privacyNote.setText("Выключено по умолчанию. При включении адреса будут видны "
-                + "авторизованным пользователям в поиске.");
+        privacyNote.setText(R.string.main_private_by_default);
         privacyNote.setTextColor(getColor(R.color.dim));
         privacyNote.setTextSize(12f);
         form.addView(privacyNote);
 
         Button avatarButton = new Button(this);
-        avatarButton.setText("Выбрать аватар");
+        avatarButton.setText(R.string.main_choose_avatar);
         avatarButton.setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.setType("image/*");
@@ -1408,16 +1413,16 @@ public class MainActivity extends LocalizedActivity {
         form.addView(avatarButton);
 
         profileStatus = new TextView(this);
-        profileStatus.setText("Загружаю профиль…");
+        profileStatus.setText(R.string.main_loading_profile);
         profileStatus.setTextColor(getColor(R.color.dim));
         form.addView(profileStatus);
         pendingAvatarJpeg = null;
 
         profileDialog = new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("Мой профиль")
+                .setTitle(R.string.main_my_profile)
                 .setView(form)
-                .setNegativeButton("Закрыть", null)
-                .setPositiveButton("Сохранить", null)
+                .setNegativeButton(R.string.main_close, null)
+                .setPositiveButton(R.string.main_save, null)
                 .create();
         profileDialog.setOnShowListener(ignored -> {
             profileDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(getColor(R.color.mint));
@@ -1444,7 +1449,8 @@ public class MainActivity extends LocalizedActivity {
                 try {
                     avatar = CloudSyncClient.downloadAvatar(profile);
                 } catch (IOException exception) {
-                    avatarWarning = "Не удалось загрузить аватар: " + exception.getMessage();
+                    avatarWarning = getString(
+                            R.string.main_avatar_load_failed, exception.getMessage());
                     Log.w(TAG, "Не удалось загрузить аватар профиля", exception);
                 }
                 byte[] avatarBytes = avatar;
@@ -1467,8 +1473,8 @@ public class MainActivity extends LocalizedActivity {
                     profileStatus.setText(warning != null
                             ? warning
                             : profile.avatarPath == null
-                            ? "Аватар не установлен."
-                            : "Текущий аватар установлен.");
+                            ? getString(R.string.main_avatar_not_set)
+                            : getString(R.string.main_avatar_set));
                 });
             } catch (Exception exception) {
                 handler.post(() -> {
@@ -1489,7 +1495,7 @@ public class MainActivity extends LocalizedActivity {
         boolean share = profileShareServers.isChecked();
         byte[] avatar = pendingAvatarJpeg;
         if (profileStatus != null) {
-            profileStatus.setText("Сохраняю профиль…");
+            profileStatus.setText(R.string.main_saving_profile);
         }
         profileDialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
         syncExecutor.execute(() -> {
@@ -1505,7 +1511,7 @@ public class MainActivity extends LocalizedActivity {
                     }
                     accountAvatarRequests.remove(session.userId);
                     updateAccountButton();
-                    Toast.makeText(this, "Профиль сохранён.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, R.string.main_profile_saved, Toast.LENGTH_SHORT).show();
                 });
             } catch (Exception exception) {
                 handler.post(() -> {
@@ -1541,7 +1547,7 @@ public class MainActivity extends LocalizedActivity {
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             if (!resized.compress(Bitmap.CompressFormat.JPEG, 86, output)
                     || output.size() > 2 * 1024 * 1024) {
-                throw new IOException("Изображение слишком большое для аватара.");
+                throw new IOException(getString(R.string.main_avatar_too_large));
             }
             pendingAvatarJpeg = output.toByteArray();
             if (profileAvatarView != null) {
@@ -1552,7 +1558,7 @@ public class MainActivity extends LocalizedActivity {
                 }
             }
             if (profileStatus != null) {
-                profileStatus.setText("Аватар готов к загрузке.");
+                profileStatus.setText(R.string.main_avatar_ready);
             }
             if (square != selected) {
                 square.recycle();
@@ -1563,7 +1569,8 @@ public class MainActivity extends LocalizedActivity {
             selected.recycle();
         } catch (Exception exception) {
             if (profileStatus != null) {
-                profileStatus.setText("Не удалось открыть изображение: " + exception.getMessage());
+                profileStatus.setText(getString(
+                        R.string.main_image_open_failed, exception.getMessage()));
             }
         }
     }
@@ -1573,12 +1580,12 @@ public class MainActivity extends LocalizedActivity {
         bounds.inJustDecodeBounds = true;
         try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
             if (input == null) {
-                throw new IOException("Не удалось открыть выбранное изображение.");
+                throw new IOException(getString(R.string.profile_image_open_failed));
             }
             BitmapFactory.decodeStream(input, null, bounds);
         }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-            throw new IOException("Выбранный файл не является изображением.");
+            throw new IOException(getString(R.string.main_selected_file_not_image));
         }
         int sample = 1;
         while (Math.max(bounds.outWidth / sample, bounds.outHeight / sample) > 1024) {
@@ -1589,7 +1596,7 @@ public class MainActivity extends LocalizedActivity {
         try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
             Bitmap selected = input == null ? null : BitmapFactory.decodeStream(input, null, options);
             if (selected == null) {
-                throw new IOException("Не удалось прочитать изображение.");
+                throw new IOException(getString(R.string.main_image_read_failed));
             }
             return selected;
         }
@@ -1608,7 +1615,7 @@ public class MainActivity extends LocalizedActivity {
 
         LinearLayout tabs = new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
-        String[] tabNames = {"Игроки", "Серверы", "Подписки"};
+        String[] tabNames = getResources().getStringArray(R.array.main_community_tabs);
         Button[] tabButtons = new Button[tabNames.length];
         for (int i = 0; i < tabNames.length; i++) {
             final int mode = i;
@@ -1622,7 +1629,7 @@ public class MainActivity extends LocalizedActivity {
 
         communitySearch = new EditText(this);
         communitySearch.setSingleLine(true);
-        communitySearch.setHint("Ник, имя или сервер (от 2 символов)");
+        communitySearch.setHint(R.string.main_community_search_hint);
         root.addView(communitySearch);
 
         ScrollView resultsScroll = new ScrollView(this);
@@ -1634,9 +1641,9 @@ public class MainActivity extends LocalizedActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(360)));
 
         communityDialog = new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("Сообщество")
+                .setTitle(R.string.main_community_title)
                 .setView(root)
-                .setNegativeButton("Закрыть", null)
+                .setNegativeButton(R.string.main_close, null)
                 .create();
         communityDialog.setOnDismissListener(ignored -> {
             communityDialog = null;
@@ -1690,10 +1697,10 @@ public class MainActivity extends LocalizedActivity {
                 ? "" : communitySearch.getText().toString().trim();
         communityResults.removeAllViews();
         if (mode != 2 && query.length() < 2) {
-            addCommunityMessage("Введи не менее двух символов для поиска.");
+            addCommunityMessage(getString(R.string.main_enter_two_characters));
             return;
         }
-        addCommunityMessage("Ищу…");
+        addCommunityMessage(getString(R.string.main_searching));
         syncExecutor.execute(() -> {
             List<CloudSyncClient.PublicProfile> profiles = null;
             List<CloudSyncClient.PublicServer> servers = null;
@@ -1737,8 +1744,9 @@ public class MainActivity extends LocalizedActivity {
             boolean followed,
             AccountSession session) {
         if (profiles.isEmpty()) {
-            addCommunityMessage(followed ? "Ты пока ни на кого не подписан."
-                    : "Ничего не найдено.");
+            addCommunityMessage(followed
+                    ? getString(R.string.main_not_following_anyone)
+                    : getString(R.string.main_nothing_found));
             return;
         }
         for (CloudSyncClient.PublicProfile profile : profiles) {
@@ -1755,8 +1763,10 @@ public class MainActivity extends LocalizedActivity {
             avatar.setTag(profile.userId);
             identity.addView(avatar, new LinearLayout.LayoutParams(dp(40), dp(40)));
             TextView title = new TextView(this);
-            title.setText((profile.displayName.isEmpty()
-                    ? profile.username : profile.displayName + "  @" + profile.username));
+            title.setText(profile.displayName.isEmpty()
+                    ? profile.username
+                    : getString(R.string.profile_identity,
+                            profile.displayName, profile.username));
             title.setTextColor(getColor(R.color.soft));
             title.setTextSize(15);
             title.setOnClickListener(v -> {
@@ -1779,11 +1789,12 @@ public class MainActivity extends LocalizedActivity {
             LinearLayout actions = new LinearLayout(this);
             actions.setOrientation(LinearLayout.HORIZONTAL);
             Button follow = new Button(this);
-            follow.setText(profile.isFollowing ? "Отписаться" : "Подписаться");
+            follow.setText(profile.isFollowing
+                    ? R.string.profile_unfollow : R.string.profile_follow);
             follow.setOnClickListener(v -> changeFollow(session, profile));
             actions.addView(follow);
             Button servers = new Button(this);
-            servers.setText("Серверы");
+            servers.setText(R.string.main_community_servers);
             servers.setOnClickListener(v -> loadProfileServers(session, profile));
             actions.addView(servers);
             row.addView(actions);
@@ -1816,7 +1827,7 @@ public class MainActivity extends LocalizedActivity {
                 }
                 Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
                 if (bitmap == null) {
-                    throw new IOException("Изображение аватара повреждено.");
+                    throw new IOException(getString(R.string.profile_broken_avatar));
                 }
                 handler.post(() -> {
                     if (!isFinishing() && profile.userId.equals(imageView.getTag())) {
@@ -1831,7 +1842,7 @@ public class MainActivity extends LocalizedActivity {
 
     private void renderCommunityServers(List<CloudSyncClient.PublicServer> servers) {
         if (servers.isEmpty()) {
-            addCommunityMessage("Публичных серверов не найдено.");
+            addCommunityMessage(getString(R.string.main_public_servers_not_found));
             return;
         }
         for (CloudSyncClient.PublicServer server : servers) {
@@ -1845,7 +1856,7 @@ public class MainActivity extends LocalizedActivity {
             row.addView(details, new LinearLayout.LayoutParams(0,
                     LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
             Button add = new Button(this);
-            add.setText("Добавить");
+            add.setText(R.string.main_add);
             add.setOnClickListener(v -> addPublicServer(server));
             row.addView(add);
             communityResults.addView(row);
@@ -1908,7 +1919,7 @@ public class MainActivity extends LocalizedActivity {
         for (ServerEntry existing : servers) {
             if (ServerEntry.normalize(existing.address)
                     .equalsIgnoreCase(ServerEntry.normalize(server.address))) {
-                Toast.makeText(this, "Этот сервер уже есть в списке.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.main_server_already_added, Toast.LENGTH_SHORT).show();
                 return;
             }
         }
@@ -1919,7 +1930,7 @@ public class MainActivity extends LocalizedActivity {
         buildCards();
         requestCloudSync(true);
         publishServerToCatalog(entry);
-        Toast.makeText(this, "Сервер добавлен.", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, R.string.main_server_added, Toast.LENGTH_SHORT).show();
     }
 
     private void applySavedAccent() {
@@ -1973,7 +1984,7 @@ public class MainActivity extends LocalizedActivity {
 
             EditText password = new EditText(this);
             password.setSingleLine(true);
-            password.setHint("Пароль (от 8 символов)");
+            password.setHint(R.string.account_password_hint);
             password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
             form.addView(password, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -2166,7 +2177,7 @@ public class MainActivity extends LocalizedActivity {
                         ensurePriorityNotificationPermission();
                         Toast.makeText(
                                 this,
-                                "Синхронизировано серверов: " + serverCount,
+                                getString(R.string.account_sync_result, serverCount),
                                 Toast.LENGTH_SHORT).show();
                     });
                 } catch (Exception exception) {
@@ -2212,7 +2223,7 @@ public class MainActivity extends LocalizedActivity {
                             if (showMessage) {
                                 Toast.makeText(
                                         this,
-                                        "Синхронизировано серверов: " + serverCount,
+                                        getString(R.string.account_sync_result, serverCount),
                                         Toast.LENGTH_SHORT).show();
                             }
                         });
@@ -2264,7 +2275,7 @@ public class MainActivity extends LocalizedActivity {
         private String cloudErrorMessage(Exception exception) {
             String message = exception.getMessage();
             if (message == null || message.trim().isEmpty()) {
-                return "Не удалось подключиться к облаку.";
+                return getString(R.string.main_no_cloud_connection);
             }
             return message;
         }
@@ -2418,14 +2429,15 @@ public class MainActivity extends LocalizedActivity {
 
     private void showServerMenu(ServerEntry entry, View anchor) {
         PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add(0, 1, 0, "Изменить");
-        menu.getMenu().add(0, 2, 1, "Добавить виджет");
-        menu.getMenu().add(0, 4, 2, "Приоритеты игроков…");
+        menu.getMenu().add(0, 1, 0, R.string.server_action_edit);
+        menu.getMenu().add(0, 2, 1, R.string.server_action_add_widget);
+        menu.getMenu().add(0, 4, 2, R.string.server_action_priority_players);
         menu.getMenu().add(0, 5, 3,
                 entry.groupId == null || entry.groupId.isEmpty()
-                        ? "Добавить в группу…" : "Группа: " + entry.groupId);
+                        ? getString(R.string.server_action_add_group)
+                        : getString(R.string.server_action_group, entry.groupId));
         menu.getMenu().add(0, 6, 4,
-                entry.pinned ? "Открепить сервер" : "Закрепить сервер");
+                entry.pinned ? R.string.server_action_unpin : R.string.server_action_pin);
         boolean groupPinned = false;
         if (entry.groupId != null && !entry.groupId.isEmpty()) {
             List<ServerEntry> entries = ServerStore.load(this);
@@ -2438,11 +2450,11 @@ public class MainActivity extends LocalizedActivity {
                 }
             }
             groupPinned &= found;
-            menu.getMenu().add(0, 7, 5,
-                    groupPinned ? "Открепить группу" : "Закрепить группу");
+            menu.getMenu().add(0, 7, 5, groupPinned
+                    ? R.string.server_action_unpin_group : R.string.server_action_pin_group);
         }
         final boolean groupPinState = groupPinned;
-        menu.getMenu().add(0, 3, 6, "Удалить");
+        menu.getMenu().add(0, 3, 6, R.string.server_action_delete);
         menu.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == 1) {
                 showServerDialog(entry);
@@ -2531,7 +2543,7 @@ public class MainActivity extends LocalizedActivity {
         input.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
         input.setMinLines(4);
         input.setMaxLines(8);
-        input.setHint("Например:\nNotch\nJeb_\nDinnerbone");
+        input.setHint(R.string.priority_examples);
         input.setInputType(InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_FLAG_MULTI_LINE
                 | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
@@ -2540,11 +2552,11 @@ public class MainActivity extends LocalizedActivity {
         }
 
         AlertDialog dialog = new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("Приоритеты · " + entry.displayName())
-                .setMessage("Уведомления о входе и выходе будут только для этих ников.")
+                .setTitle(getString(R.string.priority_dialog_title, entry.displayName()))
+                .setMessage(R.string.priority_dialog_message)
                 .setView(input)
-                .setNegativeButton("Отмена", null)
-                .setPositiveButton("Сохранить", null)
+                .setNegativeButton(R.string.account_cancel, null)
+                .setPositiveButton(R.string.main_save, null)
                 .create();
         dialog.setOnShowListener(ignored -> {
             Button save = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
@@ -2559,11 +2571,11 @@ public class MainActivity extends LocalizedActivity {
                         continue;
                     }
                     if (name.length() > 32 || name.matches(".*\\s+.*")) {
-                        input.setError("Ник до 32 символов, без пробелов");
+                        input.setError(getString(R.string.priority_invalid_nickname));
                         return;
                     }
                     if (names.size() >= 50) {
-                        input.setError("Можно отслеживать не больше 50 ников");
+                        input.setError(getString(R.string.priority_limit_reached));
                         return;
                     }
                     if (seen.add(name.toLowerCase(Locale.ROOT))) {
@@ -2580,8 +2592,8 @@ public class MainActivity extends LocalizedActivity {
                 }
                 dialog.dismiss();
                 Toast.makeText(this, names.isEmpty()
-                        ? "Отслеживание игроков выключено"
-                        : "Приоритеты сохранены и синхронизируются",
+                        ? R.string.priority_disabled
+                        : R.string.priority_saved,
                         Toast.LENGTH_SHORT).show();
             });
         });
@@ -2664,12 +2676,12 @@ public class MainActivity extends LocalizedActivity {
             }
         }
         List<String> options = new java.util.ArrayList<>();
-        options.add("Без группы");
+        options.add(getString(R.string.group_none));
         options.addAll(groups);
-        options.add("＋ Создать новую группу");
+        options.add(getString(R.string.group_create_option));
         String[] labels = options.toArray(new String[0]);
         new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("Группа серверов")
+                .setTitle(R.string.group_dialog_title)
                 .setItems(labels, (dialog, which) -> {
                     if (which == labels.length - 1) {
                         showCreateGroupDialog(entry, groups);
@@ -2677,19 +2689,19 @@ public class MainActivity extends LocalizedActivity {
                         saveGroup(entry, which == 0 ? "" : groups.get(which - 1));
                     }
                 })
-                .setNegativeButton("Отмена", null)
+                .setNegativeButton(R.string.account_cancel, null)
                 .show();
     }
 
     private void showCreateGroupDialog(ServerEntry entry, List<String> existingGroups) {
         EditText input = new EditText(this);
         input.setSingleLine(true);
-        input.setHint("Название группы");
+        input.setHint(R.string.group_name_hint);
         AlertDialog dialog = new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("Новая группа")
+                .setTitle(R.string.group_new_title)
                 .setView(input)
-                .setNegativeButton("Отмена", null)
-                .setPositiveButton("Создать", null)
+                .setNegativeButton(R.string.account_cancel, null)
+                .setPositiveButton(R.string.group_create, null)
                 .create();
         dialog.setOnShowListener(ignored -> {
             Button create = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
@@ -2697,7 +2709,7 @@ public class MainActivity extends LocalizedActivity {
             create.setOnClickListener(v -> {
                 String name = input.getText().toString().trim();
                 if (name.isEmpty() || name.length() > 60) {
-                    input.setError("Название должно содержать 1–60 символов");
+                    input.setError(getString(R.string.group_name_error));
                     return;
                 }
                 String selected = name;
@@ -2727,8 +2739,9 @@ public class MainActivity extends LocalizedActivity {
         entry.groupId = groupId;
         ServerStore.saveEntry(this, entry);
         requestCloudSync(true);
-        Toast.makeText(this,
-                groupId.isEmpty() ? "Сервер убран из группы" : "Сервер добавлен в группу " + groupId,
+        Toast.makeText(this, groupId.isEmpty()
+                        ? getString(R.string.group_server_removed)
+                        : getString(R.string.group_server_added, groupId),
                 Toast.LENGTH_SHORT).show();
     }
 
@@ -2739,7 +2752,7 @@ public class MainActivity extends LocalizedActivity {
         Spinner protocolInput = view.findViewById(R.id.protocolInput);
         TextView addressLabel = view.findViewById(R.id.addressLabel);
         TextView protocolHint = view.findViewById(R.id.protocolHint);
-        String[] protocolLabels = {"Java Edition", "Bedrock Edition"};
+        String[] protocolLabels = getResources().getStringArray(R.array.server_protocol_names);
         ArrayAdapter<String> protocolAdapter = new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_item, protocolLabels);
         protocolAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -2750,12 +2763,14 @@ public class MainActivity extends LocalizedActivity {
             public void onItemSelected(
                     android.widget.AdapterView<?> parent, View selected, int position, long id) {
                 addressInput.setHint(position == 1
-                        ? "mc.example.com или host:19132"
-                        : "mc.example.com или host:25565");
-                addressLabel.setText(position == 1 ? "Адрес сервера Bedrock" : "IP сервера");
+                        ? R.string.server_address_hint_bedrock
+                        : R.string.server_address_hint_java);
+                addressLabel.setText(position == 1
+                        ? R.string.server_address_label_bedrock
+                        : R.string.server_address_label_java);
                 protocolHint.setText(position == 1
-                        ? "Bedrock Edition · порт по умолчанию 19132"
-                        : "Java Edition · порт по умолчанию 25565");
+                        ? R.string.server_protocol_hint_bedrock
+                        : R.string.server_protocol_hint_java);
             }
 
             @Override
@@ -2769,10 +2784,11 @@ public class MainActivity extends LocalizedActivity {
         }
 
         AlertDialog dialog = new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle(entry == null ? "Новый сервер" : "Изменить сервер")
+                .setTitle(entry == null
+                        ? R.string.server_new_title : R.string.server_edit_title)
                 .setView(view)
-                .setNegativeButton("Отмена", null)
-                .setPositiveButton("Сохранить", null)
+                .setNegativeButton(R.string.account_cancel, null)
+                .setPositiveButton(R.string.main_save, null)
                 .create();
 
         dialog.setOnShowListener(ignored -> {
@@ -2785,15 +2801,15 @@ public class MainActivity extends LocalizedActivity {
                 String name = nameInput.getText().toString().trim();
 
                 if (address.isEmpty()) {
-                    addressInput.setError("Введи IP или домен сервера");
+                    addressInput.setError(getString(R.string.server_enter_address));
                     return;
                 }
                 if (address.length() > 120) {
-                    addressInput.setError("Слишком длинный адрес");
+                    addressInput.setError(getString(R.string.server_address_too_long));
                     return;
                 }
                 if (ServerStore.isAddressTaken(this, address, entry == null ? null : entry.id)) {
-                    addressInput.setError("Этот сервер уже есть в списке");
+                    addressInput.setError(getString(R.string.server_duplicate));
                     return;
                 }
 
@@ -2842,10 +2858,10 @@ public class MainActivity extends LocalizedActivity {
 
     private void confirmDelete(ServerEntry entry) {
         AlertDialog dialog = new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("Удалить сервер?")
-                .setMessage("«" + entry.displayName() + "» исчезнет из списка.")
-                .setNegativeButton("Отмена", null)
-                .setPositiveButton("Удалить", (ignored, which) -> {
+                .setTitle(R.string.server_delete_title)
+                .setMessage(getString(R.string.server_delete_message, entry.displayName()))
+                .setNegativeButton(R.string.account_cancel, null)
+                .setPositiveButton(R.string.server_action_delete, (ignored, which) -> {
                     ServerStore.delete(this, entry.id);
                     if (!ServerStore.isAddressTaken(this, entry.address, null)) {
                         StatusCache.clear(this, entry.address);
@@ -2864,15 +2880,14 @@ public class MainActivity extends LocalizedActivity {
 
     private void showWidgetPicker(ServerEntry entry) {
         List<String> options = new java.util.ArrayList<>();
-        options.add("2 × 2 · компактный");
-        options.add("2 × 1 · мини-виджет");
-        options.add("3 × 3 · со списком игроков");
+        options.addAll(java.util.Arrays.asList(
+                getResources().getStringArray(R.array.widget_sizes)));
         boolean hasGroup = entry.groupId != null && !entry.groupId.trim().isEmpty();
         if (hasGroup) {
             options.add(getString(R.string.widget_group_add, entry.groupId));
         }
         new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("Виджет для «" + entry.displayName() + "»")
+                .setTitle(getString(R.string.widget_server_title, entry.displayName()))
                 .setItems(options.toArray(new String[0]), (dialog, which) -> {
                     if (hasGroup && which == options.size() - 1) {
                         pinWidget(entry, WidgetStore.KIND_GROUP, entry.groupId);
@@ -2880,7 +2895,7 @@ public class MainActivity extends LocalizedActivity {
                         pinWidget(entry, which);
                     }
                 })
-                .setNegativeButton("Отмена", null)
+                .setNegativeButton(R.string.account_cancel, null)
                 .show();
     }
 
@@ -2936,9 +2951,9 @@ public class MainActivity extends LocalizedActivity {
 
     private void showWidgetFallback() {
         new AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("Как добавить виджет")
-                .setMessage("Зажми пустое место на главном экране → «Виджеты» → найди MC Monitor → выбери 2×1, 2×2 или 3×3.\n\nЧтобы виджет показывал конкретный сервер, удобнее добавлять его из меню ⋮ у сервера.")
-                .setPositiveButton("Понятно", null)
+                .setTitle(R.string.widget_how_to_add_title)
+                .setMessage(R.string.widget_how_to_add_message)
+                .setPositiveButton(R.string.widget_understood, null)
                 .show();
     }
 
@@ -2954,18 +2969,6 @@ public class MainActivity extends LocalizedActivity {
             }
         }
         WidgetUpdater.renderAll(this);
-    }
-
-    private String pluralServers(int count) {
-        int mod10 = count % 10;
-        int mod100 = count % 100;
-        if (mod10 == 1 && mod100 != 11) {
-            return "сервер";
-        }
-        if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
-            return "сервера";
-        }
-        return "серверов";
     }
 
     private String shorten(String value, int max) {

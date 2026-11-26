@@ -20,7 +20,7 @@
             android:layout_marginEnd="10dp"
             android:background="@drawable/bg_server_icon"
             android:clipToOutline="true"
-            android:contentDescription="Иконка сервера"
+            android:contentDescription="@string/server_icon_description"
             android:scaleType="centerCrop"
             android:visibility="gone" />
 
@@ -37,7 +37,7 @@
                 android:ellipsize="end"
                 android:fontFamily="sans-serif-medium"
                 android:maxLines="1"
-                android:text="Сервер"
+                android:text="@string/server_new_title"
                 android:textColor="@color/text"
                 android:textSize="17sp" />
 
@@ -60,7 +60,7 @@
             android:layout_marginStart="2dp"
             android:background="?android:attr/selectableItemBackgroundBorderless"
             android:clickable="true"
-            android:contentDescription="Меню сервера"
+            android:contentDescription="@string/server_menu_description"
             android:focusable="true"
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
@@ -113,7 +113,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="4dp"
-            android:text="проверяю"
+            android:text="@string/main_checking"
             android:textColor="@color/amber"
             android:textSize="11sp" />
     </LinearLayout>
@@ -126,7 +126,7 @@
         android:layout_marginTop="1dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:text="тяну статус…"
+        android:text="@string/main_loading_status"
         android:textColor="@color/dim"
         android:textSize="11sp" />
 
@@ -150,7 +150,7 @@
             android:layout_weight="1"
             android:fontFamily="sans-serif-medium"
             android:letterSpacing="0.13"
-            android:text="ИГРОКИ"
+            android:text="@string/widget_players_label"
             android:textColor="@color/dim"
             android:textSize="9sp" />
 
@@ -174,7 +174,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="7dp"
-        android:text="Загружаю список игроков…"
+        android:text="@string/main_loading_players"
         android:textColor="@color/soft"
         android:textSize="12sp" />
 </LinearLayout>

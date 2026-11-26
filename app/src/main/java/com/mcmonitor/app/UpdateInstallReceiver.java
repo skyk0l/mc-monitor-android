@@ -11,6 +11,7 @@ import android.widget.Toast;
 public class UpdateInstallReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
+        context = AppLanguage.wrap(context);
         int status = intent.getIntExtra(
                 PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
         if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
@@ -28,13 +29,14 @@ public class UpdateInstallReceiver extends BroadcastReceiver {
             return;
         }
         if (status == PackageInstaller.STATUS_SUCCESS) {
-            Toast.makeText(context, "Обновление установлено.", Toast.LENGTH_LONG).show();
+            Toast.makeText(context, R.string.update_installed, Toast.LENGTH_LONG).show();
         } else {
             String message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
             Toast.makeText(
                     context,
-                    "Не удалось установить обновление"
-                            + (message == null || message.isEmpty() ? "." : ": " + message),
+                    message == null || message.isEmpty()
+                            ? context.getString(R.string.update_install_failed_generic)
+                            : context.getString(R.string.update_install_failed, message),
                     Toast.LENGTH_LONG).show();
         }
     }
