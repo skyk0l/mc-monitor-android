@@ -10,6 +10,11 @@
     <string name="settings_title">Settings</string>
     <string name="settings_subtitle">App and widget appearance</string>
     <string name="settings_app_color">APP ACCENT COLOR</string>
+    <string name="settings_custom_accent">Custom color…</string>
+    <string name="settings_custom_accent_hint">HEX, for example #7EE0A3</string>
+    <string name="settings_custom_accent_invalid">Enter a color in #RRGGBB format.</string>
+    <string name="settings_app_background">APP BACKGROUND</string>
+    <string name="settings_app_pattern">BACKGROUND PATTERN</string>
     <string name="settings_notifications">NOTIFICATIONS</string>
     <string name="settings_notification_window">Priority-player notifications are delivered only during the selected hours.</string>
     <string name="settings_dnd_mode">Do Not Disturb</string>
@@ -183,6 +188,12 @@
     <string name="main_selected_file_not_image">The selected file is not an image.</string>
     <string name="main_image_read_failed">Could not read image.</string>
     <string name="main_no_cloud_connection">Could not connect to cloud service.</string>
+    <string name="cloud_profile_migration_required">The profile schema is out of date. Apply supabase_public_profiles.sql, then supabase_profile_social_details.sql.</string>
+    <string name="cloud_invalid_credentials">Incorrect username/email or password.</string>
+    <string name="cloud_email_not_confirmed">Verify your email address and try signing in again.</string>
+    <string name="cloud_account_exists">An account with this username or email already exists.</string>
+    <string name="cloud_too_many_attempts">Too many attempts. Try again later.</string>
+    <string name="cloud_permission_denied">You do not have permission to perform this action.</string>
     <string name="main_subscription_search">Following</string>
     <string name="main_community_players">Players</string>
     <string name="main_community_servers">Servers</string>
@@ -294,6 +305,18 @@
         <item>Pink</item>
         <item>Amber</item>
     </string-array>
+    <string-array name="app_background_scene_names">
+        <item>Northern lights</item>
+        <item>Ocean</item>
+        <item>Twilight</item>
+        <item>Amber horizon</item>
+        <item>Graphite</item>
+    </string-array>
+    <string-array name="app_background_pattern_names">
+        <item>Soft glow</item>
+        <item>Waves</item>
+        <item>Orbits</item>
+    </string-array>
     <string-array name="widget_accent_names">
         <item>Mint</item>
         <item>Blue</item>
@@ -302,10 +325,10 @@
         <item>Amber</item>
     </string-array>
     <string-array name="widget_background_names">
-        <item>Graphite</item>
-        <item>Blue</item>
-        <item>Purple</item>
-        <item>Warm</item>
+        <item>Moss</item>
+        <item>Ocean</item>
+        <item>Amethyst</item>
+        <item>Warm stone</item>
     </string-array>
     <string name="account_button">Account</string>
     <string name="account_recovery_note">Without an email, a forgotten password cannot be recovered.</string>

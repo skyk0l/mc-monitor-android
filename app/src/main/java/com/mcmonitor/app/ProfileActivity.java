@@ -89,8 +89,11 @@ public class ProfileActivity extends LocalizedActivity {
     private void buildPage() {
         FrameLayout frame = new FrameLayout(this);
         BackdropView backdrop = new BackdropView(this);
-        backdrop.setAccentColor(getSharedPreferences("app_settings", MODE_PRIVATE)
-                .getInt("accent_color", 0xFF7EE0A3));
+        android.content.SharedPreferences appearance =
+                getSharedPreferences("app_settings", MODE_PRIVATE);
+        backdrop.setAccentColor(appearance.getInt("accent_color", 0xFF7EE0A3));
+        backdrop.setSceneStyle(appearance.getInt("background_style", 0));
+        backdrop.setPattern(appearance.getInt("background_pattern", 0));
         frame.addView(backdrop, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
@@ -381,7 +384,7 @@ public class ProfileActivity extends LocalizedActivity {
             try {
                 if ("servers".equals(relationship)) {
                     List<CloudSyncClient.PublicServer> servers =
-                            CloudSyncClient.listPublicServers(session, targetId);
+                            CloudSyncClient.listPublicServers(session, profile);
                     runOnUiThread(() -> renderServers(servers));
                 } else {
                     List<CloudSyncClient.PublicProfile> people =
@@ -685,11 +688,6 @@ public class ProfileActivity extends LocalizedActivity {
     }
 
     private String errorMessage(Exception exception) {
-        if (exception instanceof IllegalArgumentException) {
-            return exception.getMessage();
-        }
-        return exception.getMessage() == null
-                ? getString(R.string.profile_load_failed)
-                : exception.getMessage();
+        return CloudSyncClient.safeUserErrorMessage(this, exception);
     }
 }

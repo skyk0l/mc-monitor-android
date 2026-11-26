@@ -546,13 +546,14 @@ public final class CloudSyncClient {
     }
 
     public static List<PublicServer> listPublicServers(
-            AccountSession session, String ownerId) throws IOException, JSONException {
-        String target = validateUserId(ownerId);
+            AccountSession session, PublicProfile ownerProfile)
+            throws IOException, JSONException {
+        String target = validateUserId(ownerProfile.userId);
         JSONObject body = new JSONObject();
         body.put("target_user", target);
         body.put("result_limit", 50);
         return parsePublicServers(requestWithSession(
-                "/rest/v1/rpc/list_public_servers", "POST", body, session, null), target);
+                "/rest/v1/rpc/list_public_servers", "POST", body, session, null), ownerProfile);
     }
 
     public static void followProfile(AccountSession session, String targetId)
@@ -730,7 +731,8 @@ public final class CloudSyncClient {
                 row.optBoolean("is_followed_by", false));
     }
 
-    private static List<PublicServer> parsePublicServers(String raw, String ownerFallback)
+    private static List<PublicServer> parsePublicServers(
+            String raw, PublicProfile ownerFallback)
             throws IOException, JSONException {
         JSONArray rows = new JSONArray(raw);
         List<PublicServer> result = new ArrayList<>();
@@ -739,7 +741,10 @@ public final class CloudSyncClient {
             if (row == null) {
                 throw new IOException("Supabase вернул сервер в неверном формате.");
             }
-            String ownerId = row.optString("owner_id", ownerFallback == null ? "" : ownerFallback);
+            String ownerId = row.optString("owner_id", "");
+            if (ownerId.isEmpty() && ownerFallback != null) {
+                ownerId = ownerFallback.userId;
+            }
             if (!ownerId.isEmpty()) {
                 try {
                     ownerId = validateUserId(ownerId);
@@ -747,7 +752,18 @@ public final class CloudSyncClient {
                     throw new IOException("Supabase вернул сервер с неверным владельцем.", exception);
                 }
             }
+            if (ownerFallback != null && !ownerFallback.userId.equals(ownerId)) {
+                throw new IOException("Supabase вернул сервер с неверным владельцем.");
+            }
             String username = row.optString("username", "");
+            if (username.isEmpty() && ownerFallback != null) {
+                username = ownerFallback.username;
+            }
+            if (ownerFallback != null
+                    && row.has("username")
+                    && !ownerFallback.username.equals(username)) {
+                throw new IOException("Supabase вернул сервер с неверным владельцем.");
+            }
             String address = row.optString("server_address", "");
             if (!username.matches("[A-Za-z0-9_]{3,16}") || address.trim().isEmpty()) {
                 throw new IOException("Supabase вернул сервер с неверными данными.");
@@ -756,7 +772,9 @@ public final class CloudSyncClient {
             result.add(new PublicServer(
                     ownerId,
                     username,
-                    row.optString("display_name", ""),
+                    row.optString(
+                            "display_name",
+                            ownerFallback == null ? "" : ownerFallback.displayName),
                     row.optString("server_name", address),
                     address,
                     protocol));
@@ -1154,6 +1172,53 @@ public final class CloudSyncClient {
         } catch (JSONException ignored) {
             return response.isEmpty() ? "Ошибка соединения с Supabase" : response;
         }
+    }
+
+    public static String safeUserErrorMessage(Context context, Exception exception) {
+        if (exception instanceof IllegalArgumentException) {
+            return exception.getMessage();
+        }
+        if (!(exception instanceof CloudException)) {
+            return context.getString(R.string.main_no_cloud_connection);
+        }
+
+        String message = exception.getMessage() == null ? "" : exception.getMessage();
+        String normalized = message.toLowerCase(Locale.ROOT);
+        boolean missingProfilePrivacyColumn =
+                (normalized.contains("share_followers")
+                        || normalized.contains("share_friends")
+                        || normalized.contains("share_subscriptions"))
+                        && (normalized.contains("does not exist")
+                                || normalized.contains("42703"));
+        if (missingProfilePrivacyColumn) {
+            return context.getString(R.string.cloud_profile_migration_required);
+        }
+        if (normalized.contains("server_catalog")
+                && normalized.contains("function")
+                && normalized.contains("could not find")) {
+            return context.getString(R.string.catalog_server_not_configured);
+        }
+        if (normalized.contains("invalid login credentials")) {
+            return context.getString(R.string.cloud_invalid_credentials);
+        }
+        if (normalized.contains("email not confirmed")) {
+            return context.getString(R.string.cloud_email_not_confirmed);
+        }
+        if (normalized.contains("already registered")
+                || (normalized.contains("duplicate key")
+                        && normalized.contains("username"))) {
+            return context.getString(R.string.cloud_account_exists);
+        }
+        if (normalized.contains("too many requests")
+                || normalized.contains("rate limit")) {
+            return context.getString(R.string.cloud_too_many_attempts);
+        }
+        if (normalized.contains("row-level security")
+                || normalized.contains("permission denied")
+                || normalized.contains("42501")) {
+            return context.getString(R.string.cloud_permission_denied);
+        }
+        return context.getString(R.string.main_no_cloud_connection);
     }
 
     public static final class PublicProfile {

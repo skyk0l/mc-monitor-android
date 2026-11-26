@@ -14,6 +14,8 @@ import android.graphics.Color;
 import android.graphics.Insets;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.content.res.ColorStateList;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -1450,7 +1452,8 @@ public class MainActivity extends LocalizedActivity {
                     avatar = CloudSyncClient.downloadAvatar(profile);
                 } catch (IOException exception) {
                     avatarWarning = getString(
-                            R.string.main_avatar_load_failed, exception.getMessage());
+                            R.string.main_avatar_load_failed,
+                            CloudSyncClient.safeUserErrorMessage(this, exception));
                     Log.w(TAG, "Не удалось загрузить аватар профиля", exception);
                 }
                 byte[] avatarBytes = avatar;
@@ -1570,7 +1573,8 @@ public class MainActivity extends LocalizedActivity {
         } catch (Exception exception) {
             if (profileStatus != null) {
                 profileStatus.setText(getString(
-                        R.string.main_image_open_failed, exception.getMessage()));
+                        R.string.main_image_open_failed,
+                        getString(R.string.main_image_read_failed)));
             }
         }
     }
@@ -1898,7 +1902,7 @@ public class MainActivity extends LocalizedActivity {
         syncExecutor.execute(() -> {
             try {
                 List<CloudSyncClient.PublicServer> servers =
-                        CloudSyncClient.listPublicServers(session, profile.userId);
+                        CloudSyncClient.listPublicServers(session, profile);
                 AccountSessionStore.save(getApplicationContext(), session);
                 handler.post(() -> {
                     if (communityResults == null || requestId != communityRequestId) {
@@ -1943,19 +1947,47 @@ public class MainActivity extends LocalizedActivity {
         getWindow().setStatusBarColor(
                 Build.VERSION.SDK_INT >= 35
                         ? Color.TRANSPARENT : BackdropView.topBarColor(color));
-        View addButton = findViewById(R.id.addButton);
-        int lighter = Color.rgb(
-                Color.red(color) + (255 - Color.red(color)) / 5,
-                Color.green(color) + (255 - Color.green(color)) / 5,
-                Color.blue(color) + (255 - Color.blue(color)) / 5);
-        GradientDrawable buttonBackground = new GradientDrawable(
-                GradientDrawable.Orientation.LEFT_RIGHT, new int[]{lighter, color});
-        buttonBackground.setCornerRadius(dp(18));
-        addButton.setBackground(buttonBackground);
+        styleButtons(findViewById(android.R.id.content), color);
         ((ImageView) findViewById(R.id.searchToggle)).setColorFilter(color);
         ((ImageView) findViewById(R.id.settingsButton)).setColorFilter(color);
         ((ImageView) findViewById(R.id.refresh)).setColorFilter(color);
-        ((BackdropView) findViewById(R.id.backdrop)).setAccentColor(color);
+        BackdropView backdrop = findViewById(R.id.backdrop);
+        backdrop.setAccentColor(color);
+        android.content.SharedPreferences appearance =
+                getSharedPreferences(APP_SETTINGS, MODE_PRIVATE);
+        backdrop.setSceneStyle(appearance.getInt("background_style", 0));
+        backdrop.setPattern(appearance.getInt("background_pattern", 0));
+    }
+
+    private void styleButtons(View view, int accent) {
+        if (view instanceof Button) {
+            Button button = (Button) view;
+            int lighter = Color.rgb(
+                    Color.red(accent) + (255 - Color.red(accent)) / 5,
+                    Color.green(accent) + (255 - Color.green(accent)) / 5,
+                    Color.blue(accent) + (255 - Color.blue(accent)) / 5);
+            GradientDrawable gradient = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{lighter, accent});
+            gradient.setCornerRadius(dp(18));
+            gradient.setStroke(dp(1), Color.argb(58, 255, 255, 255));
+            button.setBackground(new RippleDrawable(
+                    ColorStateList.valueOf(Color.argb(54, 255, 255, 255)),
+                    gradient,
+                    null));
+            int luminance = Color.red(accent) * 299
+                    + Color.green(accent) * 587
+                    + Color.blue(accent) * 114;
+            button.setTextColor(luminance > 150_000 ? 0xFF14201A : Color.WHITE);
+            button.setAllCaps(false);
+            button.setElevation(dp(2));
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                styleButtons(group.getChildAt(i), accent);
+            }
+        }
     }
 
         private void showAccountForm(boolean register) {
@@ -2273,11 +2305,7 @@ public class MainActivity extends LocalizedActivity {
         }
 
         private String cloudErrorMessage(Exception exception) {
-            String message = exception.getMessage();
-            if (message == null || message.trim().isEmpty()) {
-                return getString(R.string.main_no_cloud_connection);
-            }
-            return message;
+            return CloudSyncClient.safeUserErrorMessage(this, exception);
         }
 
         private String catalogErrorMessage(Exception exception) {

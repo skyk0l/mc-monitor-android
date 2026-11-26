@@ -6,6 +6,9 @@ import android.app.TimePickerDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.Insets;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.content.res.ColorStateList;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
@@ -14,10 +17,12 @@ import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
 import android.provider.Settings;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.text.InputType;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -62,6 +67,7 @@ public class SettingsActivity extends LocalizedActivity {
     private TextView dndStatus;
     private Spinner widgetTarget;
     private LinearLayout widgetOptions;
+    private RadioGroup appAccentChoices;
     private final List<Integer> widgetTargetIds = new ArrayList<>();
 
     @Override
@@ -82,6 +88,12 @@ public class SettingsActivity extends LocalizedActivity {
         root = frame;
         backdrop = new BackdropView(this);
         backdrop.setAccentColor(appAccent);
+        android.content.SharedPreferences appearance =
+                getSharedPreferences(PREFERENCES, MODE_PRIVATE);
+        int backgroundStyle = appearance.getInt("background_style", 0);
+        int backgroundPattern = appearance.getInt("background_pattern", 0);
+        backdrop.setSceneStyle(backgroundStyle);
+        backdrop.setPattern(backgroundPattern);
         frame.addView(backdrop, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         ScrollView scroll = new ScrollView(this);
@@ -151,17 +163,38 @@ public class SettingsActivity extends LocalizedActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
 
         addSection(getString(R.string.settings_app_color));
-        addColorChoices(getResources().getStringArray(R.array.app_accent_names), APP_ACCENTS,
+        appAccentChoices = addColorChoices(
+                getResources().getStringArray(R.array.app_accent_names), APP_ACCENTS,
                 getSharedPreferences("app_settings", MODE_PRIVATE)
                         .getInt("accent_color", APP_ACCENTS[0]),
                 color -> {
                     getSharedPreferences("app_settings", MODE_PRIVATE).edit()
                             .putInt("accent_color", color).apply();
                     backdrop.setAccentColor(color);
+                    styleButtons(content, color);
                     getWindow().setStatusBarColor(
                             Build.VERSION.SDK_INT >= 35
                                     ? Color.TRANSPARENT : BackdropView.topBarColor(color));
                 });
+        Button customAccent = new Button(this);
+        customAccent.setText(R.string.settings_custom_accent);
+        customAccent.setOnClickListener(v -> chooseCustomAccent());
+        content.addView(customAccent, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+
+        addSection(getString(R.string.settings_app_background));
+        addAppearanceSpinner(
+                R.array.app_background_scene_names,
+                "background_style",
+                backgroundStyle,
+                backdrop,
+                true);
+        addAppearanceSpinner(
+                R.array.app_background_pattern_names,
+                "background_pattern",
+                backgroundPattern,
+                backdrop,
+                false);
 
         addSection(getString(R.string.settings_notifications));
         addHint(getString(R.string.settings_notification_window));
@@ -249,6 +282,7 @@ public class SettingsActivity extends LocalizedActivity {
         updateStatus = text("", 12, 0xFF929A97);
         updateStatus.setPadding(0, dp(4), 0, 0);
         content.addView(updateStatus);
+        styleButtons(content, appAccent);
         applyWindowInsets();
     }
 
@@ -522,12 +556,12 @@ public class SettingsActivity extends LocalizedActivity {
         root.requestApplyInsets();
     }
 
-    private void addColorChoices(
+    private RadioGroup addColorChoices(
             String[] names, int[] colors, int selected, ColorSelectionListener listener) {
-        addColorChoices(content, names, colors, selected, listener);
+        return addColorChoices(content, names, colors, selected, listener);
     }
 
-    private void addColorChoices(
+    private RadioGroup addColorChoices(
             LinearLayout parent, String[] names, int[] colors,
             int selected, ColorSelectionListener listener) {
         RadioGroup group = new RadioGroup(this);
@@ -550,6 +584,113 @@ public class SettingsActivity extends LocalizedActivity {
             }
         });
         parent.addView(group);
+        return group;
+    }
+
+    private void addAppearanceSpinner(
+            int labelsResource,
+            String preference,
+            int selected,
+            BackdropView target,
+            boolean scene) {
+        Spinner spinner = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item,
+                getResources().getStringArray(labelsResource));
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setSelection(Math.max(0, Math.min(adapter.getCount() - 1, selected)));
+        spinner.setContentDescription(
+                getString(scene ? R.string.settings_app_background : R.string.settings_app_pattern));
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(
+                    AdapterView<?> parent, View view, int position, long id) {
+                getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit()
+                        .putInt(preference, position)
+                        .apply();
+                if (scene) {
+                    target.setSceneStyle(position);
+                } else {
+                    target.setPattern(position);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+        content.addView(spinner, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+    }
+
+    private void chooseCustomAccent() {
+        EditText colorInput = new EditText(this);
+        colorInput.setSingleLine(true);
+        colorInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        colorInput.setHint(R.string.settings_custom_accent_hint);
+        int current = getSharedPreferences(PREFERENCES, MODE_PRIVATE)
+                .getInt("accent_color", APP_ACCENTS[0]);
+        colorInput.setText(String.format(
+                java.util.Locale.ROOT, "#%06X", current & 0xFFFFFF));
+        colorInput.setSelection(colorInput.length());
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.settings_custom_accent)
+                .setView(colorInput)
+                .setNegativeButton(R.string.settings_cancel, null)
+                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                    try {
+                        String value = colorInput.getText().toString().trim();
+                        if (!value.matches("#[0-9A-Fa-f]{6}")) {
+                            throw new IllegalArgumentException("Invalid color format");
+                        }
+                        int color = Color.parseColor(value);
+                        getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit()
+                                .putInt("accent_color", color)
+                                .apply();
+                        appAccentChoices.clearCheck();
+                        backdrop.setAccentColor(color);
+                        getWindow().setStatusBarColor(
+                                Build.VERSION.SDK_INT >= 35
+                                        ? Color.TRANSPARENT : BackdropView.topBarColor(color));
+                        styleButtons(content, color);
+                    } catch (IllegalArgumentException exception) {
+                        android.widget.Toast.makeText(
+                                this, R.string.settings_custom_accent_invalid,
+                                android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .show();
+    }
+
+    private void styleButtons(View view, int accent) {
+        if (view instanceof Button) {
+            Button button = (Button) view;
+            int lighter = Color.rgb(
+                    Color.red(accent) + (255 - Color.red(accent)) / 5,
+                    Color.green(accent) + (255 - Color.green(accent)) / 5,
+                    Color.blue(accent) + (255 - Color.blue(accent)) / 5);
+            GradientDrawable gradient = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT, new int[]{lighter, accent});
+            gradient.setCornerRadius(dp(18));
+            gradient.setStroke(dp(1), Color.argb(58, 255, 255, 255));
+            button.setBackground(new RippleDrawable(
+                    ColorStateList.valueOf(Color.argb(54, 255, 255, 255)),
+                    gradient,
+                    null));
+            int luminance = Color.red(accent) * 299
+                    + Color.green(accent) * 587
+                    + Color.blue(accent) * 114;
+            button.setTextColor(luminance > 150_000 ? 0xFF14201A : Color.WHITE);
+            button.setAllCaps(false);
+            button.setElevation(dp(2));
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                styleButtons(group.getChildAt(i), accent);
+            }
+        }
     }
 
     private void setupWidgetTargets() {
@@ -712,6 +853,8 @@ public class SettingsActivity extends LocalizedActivity {
                 WidgetSettingsStore.showUpdated(this, widgetId),
                 widgetId,
                 WidgetSettingsStore::setShowUpdated);
+        styleButtons(widgetOptions, getSharedPreferences(PREFERENCES, MODE_PRIVATE)
+                .getInt("accent_color", APP_ACCENTS[0]));
     }
 
     private void addWidgetSwitch(

@@ -20,7 +20,7 @@ public final class WidgetSettingsStore {
             0xFFA7C6A4, 0xFF8DBBFF, 0xFFC1A0FF, 0xFFFF9DB5, 0xFFFFC978
     };
     public static final int[] BACKGROUNDS = {
-            0xFF151B1B, 0xFF172235, 0xFF251D32, 0xFF30231B
+            0xFF263638, 0xFF293A52, 0xFF403458, 0xFF4A382D
     };
     private WidgetSettingsStore() {
     }

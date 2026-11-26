@@ -10,6 +10,11 @@
     <string name="settings_title">Настройки</string>
     <string name="settings_subtitle">Оформление приложения и виджетов</string>
     <string name="settings_app_color">ЦВЕТ ПРИЛОЖЕНИЯ</string>
+    <string name="settings_custom_accent">Свой цвет…</string>
+    <string name="settings_custom_accent_hint">HEX, например #7EE0A3</string>
+    <string name="settings_custom_accent_invalid">Введи цвет в формате #RRGGBB.</string>
+    <string name="settings_app_background">ФОН ПРИЛОЖЕНИЯ</string>
+    <string name="settings_app_pattern">УЗОР ФОНА</string>
     <string name="settings_notifications">УВЕДОМЛЕНИЯ</string>
     <string name="settings_notification_window">Уведомления о приоритетных никах приходят только в выбранное время.</string>
     <string name="settings_dnd_mode">Режим «Не беспокоить»</string>
@@ -183,6 +188,12 @@
     <string name="main_selected_file_not_image">Выбранный файл не является изображением.</string>
     <string name="main_image_read_failed">Не удалось прочитать изображение.</string>
     <string name="main_no_cloud_connection">Не удалось подключиться к облаку.</string>
+    <string name="cloud_profile_migration_required">Схема профилей не обновлена. Примените supabase_public_profiles.sql, затем supabase_profile_social_details.sql.</string>
+    <string name="cloud_invalid_credentials">Неверный никнейм/email или пароль.</string>
+    <string name="cloud_email_not_confirmed">Подтвердите email и повторите вход.</string>
+    <string name="cloud_account_exists">Аккаунт с таким никнеймом или email уже существует.</string>
+    <string name="cloud_too_many_attempts">Слишком много попыток. Попробуйте позже.</string>
+    <string name="cloud_permission_denied">Недостаточно прав для этого действия.</string>
     <string name="main_subscription_search">Подписки</string>
     <string name="main_community_players">Игроки</string>
     <string name="main_community_servers">Серверы</string>
@@ -304,6 +315,18 @@
         <item>Розовый</item>
         <item>Янтарный</item>
     </string-array>
+    <string-array name="app_background_scene_names">
+        <item>Северное сияние</item>
+        <item>Океан</item>
+        <item>Сумерки</item>
+        <item>Янтарный горизонт</item>
+        <item>Графит</item>
+    </string-array>
+    <string-array name="app_background_pattern_names">
+        <item>Мягкое свечение</item>
+        <item>Волны</item>
+        <item>Орбиты</item>
+    </string-array>
     <string-array name="widget_accent_names">
         <item>Мятный</item>
         <item>Голубой</item>
@@ -312,10 +335,10 @@
         <item>Янтарный</item>
     </string-array>
     <string-array name="widget_background_names">
-        <item>Графит</item>
-        <item>Синий</item>
-        <item>Фиолетовый</item>
-        <item>Тёплый</item>
+        <item>Мох</item>
+        <item>Океан</item>
+        <item>Аметист</item>
+        <item>Тёплый камень</item>
     </string-array>
     <string name="account_button">Аккаунт</string>
     <string name="account_recovery_note">Без email восстановить забытый пароль нельзя.</string>
