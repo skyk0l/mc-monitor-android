@@ -140,8 +140,9 @@ public class SettingsActivity extends Activity {
         Button sortButton = new Button(this);
         updateSortLabel(sortButton);
         sortButton.setOnClickListener(v -> {
-            String[] labels = {"Вручную", "По имени", "По онлайну", "По дате добавления"};
-            String[] values = {"manual", "name", "online", "date"};
+            String[] labels = {"Вручную", "По имени", "По онлайну",
+                    "По пингу (время ответа)", "По дате добавления"};
+            String[] values = {"manual", "name", "online", "ping", "date"};
             String selected = getSharedPreferences(PREFERENCES, MODE_PRIVATE)
                     .getString("server_sort_mode", "manual");
             int selectedIndex = 0;
@@ -287,6 +288,9 @@ public class SettingsActivity extends Activity {
                 break;
             case "online":
                 label = "По онлайну";
+                break;
+            case "ping":
+                label = "По пингу (время ответа)";
                 break;
             case "date":
                 label = "По дате добавления";

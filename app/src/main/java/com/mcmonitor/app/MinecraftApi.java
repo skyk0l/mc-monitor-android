@@ -1,5 +1,7 @@
 package com.mcmonitor.app;
 
+import android.os.SystemClock;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -71,11 +73,14 @@ public final class MinecraftApi {
         if (!port.isEmpty()) {
             url += "?port=" + encode(port);
         }
+        long startedAt = SystemClock.elapsedRealtime();
         JSONObject json = getJson(url);
         if (json == null || !json.has("online")) {
             return null;
         }
-        return parseMcstatus(json, address);
+        ServerStatus status = parseMcstatus(json, address);
+        status.pingMs = Math.max(0L, SystemClock.elapsedRealtime() - startedAt);
+        return status;
     }
 
     private static ServerStatus fetchMcsrvstat(String address, String protocol) throws Exception {
@@ -87,11 +92,14 @@ public final class MinecraftApi {
         }
         String baseUrl = ServerEntry.PROTOCOL_BEDROCK.equals(protocol)
                 ? MCSRVSTAT_BEDROCK : MCSRVSTAT;
+        long startedAt = SystemClock.elapsedRealtime();
         JSONObject json = getJson(baseUrl + path);
         if (json == null || !json.has("online")) {
             return null;
         }
-        return parseMcsrvstat(json, address);
+        ServerStatus status = parseMcsrvstat(json, address);
+        status.pingMs = Math.max(0L, SystemClock.elapsedRealtime() - startedAt);
+        return status;
     }
 
     private static ServerStatus parseMcstatus(JSONObject json, String address) {

@@ -419,6 +419,26 @@ public class MainActivity extends Activity {
                     return countOrder;
                 }
             }
+            if ("ping".equals(mode)) {
+                ServerStatus firstStatus = StatusCache.load(MainActivity.this, first.address);
+                ServerStatus secondStatus = StatusCache.load(MainActivity.this, second.address);
+                boolean firstOnline = firstStatus != null && firstStatus.hasData
+                        && firstStatus.online;
+                boolean secondOnline = secondStatus != null && secondStatus.hasData
+                        && secondStatus.online;
+                int onlineOrder = Boolean.compare(secondOnline, firstOnline);
+                if (onlineOrder != 0) {
+                    return onlineOrder;
+                }
+                long firstPing = firstOnline && firstStatus.pingMs >= 0L
+                        ? firstStatus.pingMs : Long.MAX_VALUE;
+                long secondPing = secondOnline && secondStatus.pingMs >= 0L
+                        ? secondStatus.pingMs : Long.MAX_VALUE;
+                int pingOrder = Long.compare(firstPing, secondPing);
+                if (pingOrder != 0) {
+                    return pingOrder;
+                }
+            }
             return 0;
         };
         entries.sort(comparator);

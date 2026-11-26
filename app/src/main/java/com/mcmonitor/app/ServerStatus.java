@@ -23,6 +23,8 @@ public class ServerStatus {
     public String favicon = "";
     public String error = "";
     public long updatedAt = 0L;
+    /** Round-trip time to the public status provider, not the game server itself. */
+    public long pingMs = -1L;
 
     public JSONObject toJson() throws JSONException {
         JSONObject json = new JSONObject();
@@ -41,6 +43,7 @@ public class ServerStatus {
         json.put("favicon", favicon);
         json.put("error", error);
         json.put("updatedAt", updatedAt);
+        json.put("pingMs", pingMs);
         return json;
     }
 
@@ -70,6 +73,7 @@ public class ServerStatus {
             status.favicon = json.optString("favicon", "");
             status.error = json.optString("error", "");
             status.updatedAt = json.optLong("updatedAt", 0L);
+            status.pingMs = json.optLong("pingMs", -1L);
             return status;
         } catch (JSONException ignored) {
             return null;
