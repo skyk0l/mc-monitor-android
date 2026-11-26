@@ -17,13 +17,20 @@ import android.provider.Settings;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.SeekBar;
 import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 
@@ -31,6 +38,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /** Dedicated settings screen for app accents and widget appearance. */
 public class SettingsActivity extends Activity {
@@ -55,6 +65,9 @@ public class SettingsActivity extends Activity {
     private Button notificationStartButton;
     private Button notificationEndButton;
     private TextView dndStatus;
+    private Spinner widgetTarget;
+    private LinearLayout widgetOptions;
+    private final List<Integer> widgetTargetIds = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -168,23 +181,14 @@ public class SettingsActivity extends Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
 
         addSection("ВИДЖЕТЫ");
-        addHint("Цвета и видимая информация сохраняются на устройстве и сразу применяются.");
-        addColorChoices(WidgetSettingsStore.ACCENT_NAMES,
-                WidgetSettingsStore.ACCENTS,
-                WidgetSettingsStore.accent(this),
-                color -> {
-                    WidgetSettingsStore.setAccent(this, color);
-                    WidgetUpdater.renderAll(this);
-                });
-        addPaletteChoices();
-        addSwitch("Показывать название сервера", WidgetSettingsStore.showName(this),
-                WidgetSettingsStore::setShowName);
-        addSwitch("Показывать список игроков", WidgetSettingsStore.showPlayers(this),
-                WidgetSettingsStore::setShowPlayers);
-        addSwitch("Показывать версию сервера", WidgetSettingsStore.showVersion(this),
-                WidgetSettingsStore::setShowVersion);
-        addSwitch("Показывать время обновления", WidgetSettingsStore.showUpdated(this),
-                WidgetSettingsStore::setShowUpdated);
+        addHint("Настройки можно задать отдельно для каждого виджета.");
+        widgetTarget = new Spinner(this);
+        content.addView(widgetTarget, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+        widgetOptions = new LinearLayout(this);
+        widgetOptions.setOrientation(LinearLayout.VERTICAL);
+        content.addView(widgetOptions);
+        setupWidgetTargets();
 
         TextView account = text("Аккаунт и синхронизация находятся в меню профиля.", 12, 0xFF929A97);
         account.setPadding(0, dp(18), 0, 0);
@@ -477,6 +481,12 @@ public class SettingsActivity extends Activity {
 
     private void addColorChoices(
             String[] names, int[] colors, int selected, ColorSelectionListener listener) {
+        addColorChoices(content, names, colors, selected, listener);
+    }
+
+    private void addColorChoices(
+            LinearLayout parent, String[] names, int[] colors,
+            int selected, ColorSelectionListener listener) {
         RadioGroup group = new RadioGroup(this);
         group.setOrientation(RadioGroup.VERTICAL);
         for (int i = 0; i < names.length; i++) {
@@ -496,14 +506,90 @@ public class SettingsActivity extends Activity {
                 listener.select((Integer) checked.getTag());
             }
         });
-        content.addView(group);
+        parent.addView(group);
     }
 
-    private void addPaletteChoices() {
-        addSection("ФОН ВИДЖЕТА");
+    private void setupWidgetTargets() {
+        List<String> labels = new ArrayList<>();
+        widgetTargetIds.clear();
+        labels.add("Настройки по умолчанию");
+        widgetTargetIds.add(0);
+
+        for (Map.Entry<Integer, WidgetStore.Info> entry : WidgetStore.all(this).entrySet()) {
+            WidgetStore.Info info = entry.getValue();
+            String label;
+            if (info.kind == WidgetStore.KIND_GROUP
+                    && info.groupId != null && !info.groupId.isEmpty()) {
+                label = "Группа " + info.groupId;
+            } else {
+                ServerEntry server = ServerStore.findByAddress(this, info.address);
+                label = server == null ? info.address : server.displayName();
+            }
+            labels.add(label + " · #" + entry.getKey());
+            widgetTargetIds.add(entry.getKey());
+        }
+
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item, labels);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        widgetTarget.setAdapter(adapter);
+        widgetTarget.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(
+                    AdapterView<?> parent, View view, int position, long id) {
+                buildWidgetOptions(widgetTargetIds.get(position));
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                widgetOptions.removeAllViews();
+            }
+        });
+    }
+
+    private void buildWidgetOptions(int widgetId) {
+        widgetOptions.removeAllViews();
+        if (widgetId > 0) {
+            EditText name = new EditText(this);
+            name.setSingleLine(true);
+            name.setHint("Своё имя виджета");
+            name.setTextColor(0xFFE6E9E5);
+            name.setHintTextColor(0xFF929A97);
+            name.setText(WidgetSettingsStore.name(this, widgetId));
+            name.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence value, int start, int count, int after) {
+                }
+
+                @Override
+                public void onTextChanged(CharSequence value, int start, int before, int count) {
+                    WidgetSettingsStore.setName(
+                            SettingsActivity.this, widgetId, value.toString());
+                    WidgetUpdater.renderAll(SettingsActivity.this);
+                }
+
+                @Override
+                public void afterTextChanged(Editable value) {
+                }
+            });
+            widgetOptions.addView(name);
+        }
+
+        addSection(widgetOptions, "АКЦЕНТНЫЙ ЦВЕТ");
+        addColorChoices(
+                widgetOptions,
+                WidgetSettingsStore.ACCENT_NAMES,
+                WidgetSettingsStore.ACCENTS,
+                WidgetSettingsStore.accent(this, widgetId),
+                color -> {
+                    WidgetSettingsStore.setAccent(this, widgetId, color);
+                    WidgetUpdater.renderAll(this);
+                });
+
+        addSection(widgetOptions, "ФОН");
         RadioGroup group = new RadioGroup(this);
         group.setOrientation(RadioGroup.VERTICAL);
-        int selected = WidgetSettingsStore.background(this);
+        int selected = WidgetSettingsStore.background(this, widgetId);
         for (int i = 0; i < WidgetSettingsStore.BACKGROUNDS.length; i++) {
             final int index = i;
             RadioButton button = new RadioButton(this);
@@ -519,15 +605,72 @@ public class SettingsActivity extends Activity {
         group.setOnCheckedChangeListener((checkedGroup, checkedId) -> {
             View checked = checkedGroup.findViewById(checkedId);
             if (checked != null && checked.getTag() instanceof Integer) {
-                WidgetSettingsStore.setBackground(this, (Integer) checked.getTag());
+                WidgetSettingsStore.setBackground(
+                        this, widgetId, (Integer) checked.getTag());
                 WidgetUpdater.renderAll(this);
             }
         });
-        content.addView(group);
+        widgetOptions.addView(group);
+
+        LinearLayout opacityRow = new LinearLayout(this);
+        opacityRow.setOrientation(LinearLayout.HORIZONTAL);
+        opacityRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        TextView opacityLabel = text("Прозрачность", 13, 0xFFE6E9E5);
+        opacityRow.addView(opacityLabel);
+        SeekBar opacity = new SeekBar(this);
+        opacity.setMin(40);
+        opacity.setMax(100);
+        opacity.setProgress(Math.round(
+                WidgetSettingsStore.opacity(this, widgetId) * 100f));
+        opacity.setContentDescription("Прозрачность фона виджета");
+        opacityRow.addView(opacity, new LinearLayout.LayoutParams(
+                0, dp(44), 1f));
+        TextView opacityValue = text(
+                opacity.getProgress() + "%", 12, 0xFF929A97);
+        opacityRow.addView(opacityValue);
+        opacity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                opacityValue.setText(progress + "%");
+                WidgetSettingsStore.setOpacity(
+                        SettingsActivity.this, widgetId, progress / 100f);
+                WidgetUpdater.renderAll(SettingsActivity.this);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar bar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar bar) {
+            }
+        });
+        widgetOptions.addView(opacityRow);
+
+        addWidgetSwitch(
+                "Показывать название",
+                WidgetSettingsStore.showName(this, widgetId),
+                widgetId,
+                WidgetSettingsStore::setShowName);
+        addWidgetSwitch(
+                "Показывать список игроков",
+                WidgetSettingsStore.showPlayers(this, widgetId),
+                widgetId,
+                WidgetSettingsStore::setShowPlayers);
+        addWidgetSwitch(
+                "Показывать версию",
+                WidgetSettingsStore.showVersion(this, widgetId),
+                widgetId,
+                WidgetSettingsStore::setShowVersion);
+        addWidgetSwitch(
+                "Показывать время обновления",
+                WidgetSettingsStore.showUpdated(this, widgetId),
+                widgetId,
+                WidgetSettingsStore::setShowUpdated);
     }
 
-    private void addSwitch(
-            String label, boolean checked, PreferenceSetter setter) {
+    private void addWidgetSwitch(
+            String label, boolean checked, int widgetId, WidgetPreferenceSetter setter) {
         Switch toggle = new Switch(this);
         toggle.setText(label);
         toggle.setTextColor(0xFFE6E9E5);
@@ -535,18 +678,22 @@ public class SettingsActivity extends Activity {
         toggle.setChecked(checked);
         toggle.setPadding(0, dp(5), 0, dp(5));
         toggle.setOnCheckedChangeListener((button, value) -> {
-            setter.set(this, value);
+            setter.set(this, widgetId, value);
             WidgetUpdater.renderAll(this);
         });
-        content.addView(toggle, new LinearLayout.LayoutParams(
+        widgetOptions.addView(toggle, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(52)));
     }
 
     private void addSection(String title) {
+        addSection(content, title);
+    }
+
+    private void addSection(LinearLayout parent, String title) {
         TextView heading = text(title, 11, 0xFFA7C6A4);
         heading.setTypeface(Typeface.DEFAULT_BOLD);
         heading.setPadding(0, dp(18), 0, dp(4));
-        content.addView(heading);
+        parent.addView(heading);
     }
 
     private void addHint(String value) {
@@ -571,7 +718,7 @@ public class SettingsActivity extends Activity {
         void select(int color);
     }
 
-    private interface PreferenceSetter {
-        void set(android.content.Context context, boolean value);
+    private interface WidgetPreferenceSetter {
+        void set(android.content.Context context, int widgetId, boolean value);
     }
 }

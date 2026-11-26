@@ -87,6 +87,7 @@ public final class WidgetStore {
         JSONObject map = readMap(context);
         map.remove(String.valueOf(widgetId));
         writeMap(context, map);
+        WidgetSettingsStore.clear(context, widgetId);
     }
 
     public static synchronized Map<Integer, Info> all(Context context) {

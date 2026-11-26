@@ -264,12 +264,21 @@ public final class WidgetUpdater {
 
         boolean known = status != null && status.hasData;
         boolean online = known && status.online;
-        int accent = WidgetSettingsStore.accent(context);
-        int backgroundIndex = WidgetSettingsStore.background(context);
+        int accent = WidgetSettingsStore.accent(context, widgetId);
+        int backgroundIndex = WidgetSettingsStore.background(context, widgetId);
         if (backgroundIndex < 0 || backgroundIndex >= WIDGET_BACKGROUNDS.length) {
             backgroundIndex = 0;
         }
-        views.setInt(R.id.wRoot, "setBackgroundColor", WIDGET_BACKGROUNDS[backgroundIndex]);
+        int background = WIDGET_BACKGROUNDS[backgroundIndex];
+        int alpha = Math.round(
+                android.graphics.Color.alpha(background)
+                        * WidgetSettingsStore.opacity(context, widgetId));
+        views.setInt(R.id.wRoot, "setBackgroundColor",
+                android.graphics.Color.argb(
+                        alpha,
+                        android.graphics.Color.red(background),
+                        android.graphics.Color.green(background),
+                        android.graphics.Color.blue(background)));
 
         Bitmap icon = decodeServerIcon(status);
         if (icon != null) {
@@ -277,14 +286,16 @@ public final class WidgetUpdater {
         } else {
             views.setImageViewResource(R.id.wServerIcon, R.drawable.ic_server_fallback);
         }
-        views.setTextViewText(R.id.wName, name);
+        String customName = WidgetSettingsStore.name(context, widgetId);
+        views.setTextViewText(R.id.wName, customName.isEmpty() ? name : customName);
         views.setTextViewText(R.id.wCount,
                 !known ? "—" : online ? String.valueOf(status.onlineCount) : "—");
         views.setTextColor(R.id.wCount, known && online ? accent : COLOR_TEXT);
         views.setTextViewText(R.id.wMax,
                 known && online && status.maxCount > 0 ? "/ " + status.maxCount : "");
         views.setViewVisibility(R.id.wName,
-                WidgetSettingsStore.showName(context) ? android.view.View.VISIBLE : android.view.View.GONE);
+                WidgetSettingsStore.showName(context, widgetId)
+                        ? android.view.View.VISIBLE : android.view.View.GONE);
         views.setTextColor(R.id.wRefresh, accent);
 
         if (kind != KIND_2X1) {
@@ -303,25 +314,25 @@ public final class WidgetUpdater {
                     known && online ? "ИГРОКИ · " + status.onlineCount : "ИГРОКИ");
             views.setTextViewText(R.id.wPlayersEmpty, playersText(status, 9));
             views.setViewVisibility(R.id.wPlayersLabel,
-                    WidgetSettingsStore.showPlayers(context)
+                    WidgetSettingsStore.showPlayers(context, widgetId)
                             ? android.view.View.VISIBLE : android.view.View.GONE);
             views.setViewVisibility(R.id.wPlayersEmpty,
-                    WidgetSettingsStore.showPlayers(context)
+                    WidgetSettingsStore.showPlayers(context, widgetId)
                             ? android.view.View.VISIBLE : android.view.View.GONE);
             views.setViewVisibility(R.id.wVersion,
-                    WidgetSettingsStore.showVersion(context)
+                    WidgetSettingsStore.showVersion(context, widgetId)
                             ? android.view.View.VISIBLE : android.view.View.GONE);
             views.setViewVisibility(R.id.wLastUpdated,
-                    WidgetSettingsStore.showUpdated(context)
+                    WidgetSettingsStore.showUpdated(context, widgetId)
                             ? android.view.View.VISIBLE : android.view.View.GONE);
         } else if (kind == KIND_2X2) {
             views.setTextColor(R.id.wPlayersLabel, accent);
             views.setTextViewText(R.id.wPlayersEmpty, playersText(status, 2));
             views.setViewVisibility(R.id.wPlayersLabel,
-                    WidgetSettingsStore.showPlayers(context)
+                    WidgetSettingsStore.showPlayers(context, widgetId)
                             ? android.view.View.VISIBLE : android.view.View.GONE);
             views.setViewVisibility(R.id.wPlayersEmpty,
-                    WidgetSettingsStore.showPlayers(context)
+                    WidgetSettingsStore.showPlayers(context, widgetId)
                             ? android.view.View.VISIBLE : android.view.View.GONE);
         }
 
@@ -347,13 +358,31 @@ public final class WidgetUpdater {
     private static RemoteViews buildGroup(Context context, int widgetId, String groupId) {
         RemoteViews views = new RemoteViews(
                 context.getPackageName(), R.layout.widget_remote_group);
-        int backgroundIndex = WidgetSettingsStore.background(context);
+        int backgroundIndex = WidgetSettingsStore.background(context, widgetId);
         if (backgroundIndex < 0 || backgroundIndex >= WIDGET_BACKGROUNDS.length) {
             backgroundIndex = 0;
         }
+        int background = WIDGET_BACKGROUNDS[backgroundIndex];
+        int alpha = Math.round(
+                android.graphics.Color.alpha(background)
+                        * WidgetSettingsStore.opacity(context, widgetId));
         views.setInt(
-                R.id.groupRoot, "setBackgroundColor", WIDGET_BACKGROUNDS[backgroundIndex]);
-        views.setTextViewText(R.id.groupTitle, groupId == null ? "" : groupId);
+                R.id.groupRoot,
+                "setBackgroundColor",
+                android.graphics.Color.argb(
+                        alpha,
+                        android.graphics.Color.red(background),
+                        android.graphics.Color.green(background),
+                        android.graphics.Color.blue(background)));
+        String customName = WidgetSettingsStore.name(context, widgetId);
+        views.setTextViewText(
+                R.id.groupTitle,
+                customName.isEmpty() ? (groupId == null ? "" : groupId) : customName);
+        views.setTextColor(R.id.groupRefresh, WidgetSettingsStore.accent(context, widgetId));
+        views.setViewVisibility(
+                R.id.groupTitle,
+                WidgetSettingsStore.showName(context, widgetId)
+                        ? android.view.View.VISIBLE : android.view.View.GONE);
 
         Intent adapter = new Intent(context, GroupWidgetRemoteViewsService.class)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
